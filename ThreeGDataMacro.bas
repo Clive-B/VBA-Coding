@@ -490,10 +490,10 @@ Private Function LastUsedRowInSheet(ByVal ws As Worksheet) As Long
     End If
 End Function
 
-Private Function KeepValue(ByRef Keep() As String, ByVal index As Long) As String
+Private Function KeepValue(ByVal Keep As Variant, ByVal index As Long) As String
     On Error GoTo Missing
     If index >= LBound(Keep) And index <= UBound(Keep) Then
-        KeepValue = Keep(index)
+        KeepValue = CStr(Keep(index))
     End If
     Exit Function
 Missing:
