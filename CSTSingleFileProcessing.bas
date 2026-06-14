@@ -23,6 +23,10 @@ Public Sub ProcessSingleCSTFromForm()
     Unload frm
 End Sub
 
+Public Sub ProcessSingleCSTFromSubmittedForm(ByVal frm As Object)
+    ProcessSingleCSTFiles frm.cstExcelName, frm.selectedCSTFilePath, frm.storageFolderPath
+End Sub
+
 Public Sub ProcessSingleCSTFiles(ByVal cstExcelName As String, ByVal selectedCSTFilePath As String, ByVal storageFolderPath As String)
     Dim fso As Object
     Dim relatedFiles As Collection
