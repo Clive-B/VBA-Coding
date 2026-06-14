@@ -1,4 +1,4 @@
-Attribute VB_Name = "CSTCOVMOSMacro"
+Attribute VB_Name = "CSTCOVMOSSingleMacro"
 ' Add this at the top of your module (before any procedures)
 #If VBA7 Then
     Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As LongPtr)
