@@ -36,6 +36,7 @@ Sub ProcessDataFiles()
     Dim fileList As Collection
     Dim hasMultipleTimes As Boolean
     Dim openedWorkbook As Workbook
+    Dim wb As Workbook
     Dim techType As String
 
     ' Initialize file tracking
