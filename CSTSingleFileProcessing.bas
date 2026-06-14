@@ -23,7 +23,13 @@ Public Sub ProcessSingleCSTFromForm()
     Unload frm
 End Sub
 
-Public Sub ProcessSingleCSTFromSubmittedForm(ByVal frm As Object)
+Public Sub ProcessSingleCSTFromSubmittedForm(Optional ByVal frm As Object = Nothing)
+    If frm Is Nothing Then
+        MsgBox "Call this helper from the UserForm as: ProcessSingleCSTFromSubmittedForm Me", _
+               vbExclamation, "Single CST Processing"
+        Exit Sub
+    End If
+
     ProcessSingleCSTFiles frm.cstExcelName, frm.selectedCSTFilePath, frm.storageFolderPath
 End Sub
 
