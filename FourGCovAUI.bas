@@ -6,8 +6,8 @@ Option Base 1
 #Else
     Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
-Public DirPathGlobal, workbookPathGlobal, GetKeepZero, GetKeepOne As String
-Public GetSaveZero, GetDayyZero, GetTownNameTwo As String
+Public DirPathGlobal As String, workbookPathGlobal As String, GetKeepZero As String, GetKeepOne As String
+Public GetSaveZero As String, GetDayyZero As String, GetTownNameTwo As String
 Public prevtownDayKey As Variant ' Declare global variable
 Public prevtown As String ' Declare global variable
 'Sub FourGCov(Fil As String)
@@ -19,21 +19,27 @@ Sub FourGCov(Fil As String, DirPath As String, Finish As Boolean, _
 
 
 Dim KPI As Scripting.TextStream
-Dim ArryLine, cmrt, Alert, latitude, longitude, Get_date, test_date, CallAttempt, sh, Fgname, Band, Device, ST, Sp As String
+Dim ArryLine As String, cmrt As String, Alert As String, latitude As String, longitude As String, Get_date As String, test_date As String, CallAttempt As String, sh As String, Fgname As String, Band As String, Device As String, ST As String, Sp As String
 Dim Keep() As String
-Dim WordCount As Integer
+Dim WordCount As Long
 Dim CurrentLine() As String
 Dim fileName() As String
 Dim Tdate() As String
 Dim wb As Workbook
 Dim ws As Worksheet
-Dim CurrentRow, Tow As Integer
+Dim CurrentRow As Long, Tow As Long
 Dim fso As Scripting.FileSystemObject
 Dim lRow As Long
+Dim LR As Long
 Dim Dayy() As String
 Dim hasChanged As Boolean
 Dim NameTown As String
 Dim workbookName As String
+Dim oWSHShell As Object
+Dim excelSettingsOff As Boolean
+Dim errNumber As Long, errDescription As String
+
+On Error GoTo FatalError
 
 
 Set oWSHShell = CreateObject("WScript.Shell")
@@ -70,10 +76,8 @@ If Not IsEmpty(prevtownDayKey) Then
             DeleteSheetIfExists "FILTER"
             DeleteSheetIfExists "AdvFILTER"
             DeleteSheetIfExists "AVGCAL"
-            If DeleteSheetIfExists("AVGCAL") Then
             Sheets.Add(After:=Sheets(Sheets.count)).Name = "AVGCAL"
             ThisWorkbook.Sheets("AVGCAL").Visible = xlSheetHidden
-            End If
             Application.DisplayAlerts = True
             End If
             ElseIf CStr(prevtown) = CStr(NameTown) And prevtownDayKey <> townDayKey Then
@@ -83,10 +87,8 @@ If Not IsEmpty(prevtownDayKey) Then
             DeleteSheetIfExists "FILTER"
             DeleteSheetIfExists "AdvFILTER"
             DeleteSheetIfExists "AVGCAL"
-            If DeleteSheetIfExists("AVGCAL") Then
             Sheets.Add(After:=Sheets(Sheets.count)).Name = "AVGCAL"
             ThisWorkbook.Sheets("AVGCAL").Visible = xlSheetHidden
-            End If
             Application.DisplayAlerts = True
             End If
             prevtownDayKey = townDayKey
@@ -105,6 +107,7 @@ Sheets(sh).Select
 
 CurrentRow = Range("AO1").value
 Call TurnOffStuff
+excelSettingsOff = True
 Do Until KPI.AtEndOfStream
     ArryLine = KPI.ReadLine
      CurrentLine = Split(ArryLine, ",")
@@ -112,25 +115,30 @@ Do Until KPI.AtEndOfStream
      Select Case CurrentLine(0)
      
         Case Is = "#DL"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             Device = CurrentLine(3)
             Keep = Split(CurrentLine(3), " ")
+            If UBound(Keep) < 1 Then GoTo NextLogLine
             Keep(0) = Replace(Keep(0), """", "")
             Keep(1) = Replace(Keep(1), """", "")
             GetKeepOne = Keep(1)
             GetKeepZero = Keep(0)
         Case Is = "#START"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             ST = CurrentLine(1)
             Get_date = Mid(CurrentLine(3), 2, Len(CurrentLine(3)) - 2)
             Tdate = Split(Get_date, ".")
-            test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
+            If UBound(Tdate) >= 2 Then test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
             
         Case Is = "CELLMEAS"
-                If CurrentLine(3) = 7 Or CurrentLine(3) = 8 And CurrentLine(4) = 0 And CurrentLine(5) > 0 Then  'checking for LTE technology
-                    
-                    If UBound(CurrentLine) < 7 Then
+                If UBound(CurrentLine) < 12 Then
                     CurrentRow = CurrentRow - 1
                     GoTo CurrentLineIncrement
-                    ElseIf CurrentLine(7) = 0 Then
+                End If
+
+                If (CurrentLine(3) = "7" Or CurrentLine(3) = "8") And CurrentLine(4) = "0" And IsPositiveNumber(CurrentLine(5)) Then  'checking for LTE technology
+                    
+                    If CurrentLine(7) = "0" Then
                     Range("K" & CurrentRow) = CurrentLine(1)
                     Range("L" & CurrentRow) = test_date
                     Range("M" & CurrentRow) = latitude
@@ -141,6 +149,9 @@ Do Until KPI.AtEndOfStream
                     Range("R" & CurrentRow) = MCC
                     Band = CurrentLine(8)
                     Range("S" & CurrentRow) = getBand((Band))
+                    Else
+                    CurrentRow = CurrentRow - 1
+                    GoTo CurrentLineIncrement
                     End If
                 
                 Else
@@ -150,19 +161,23 @@ Do Until KPI.AtEndOfStream
 CurrentLineIncrement:
                 CurrentRow = CurrentRow + 1
         Case Is = "GPS"
+            If UBound(CurrentLine) < 4 Then GoTo NextLogLine
         
             longitude = CurrentLine(3)
             latitude = CurrentLine(4)
             
         Case Is = "SEI"
+            If UBound(CurrentLine) < 7 Then GoTo NextLogLine
             MCC = CurrentLine(6)
             MNC = CurrentLine(7)
             
         Case Is = "#STOP"
+            If UBound(CurrentLine) < 1 Then GoTo NextLogLine
             Sp = CurrentLine(1)
             Exit Do
     
     End Select
+NextLogLine:
     
     
 Loop
@@ -195,6 +210,7 @@ Worksheets("Measurement_Info").Range("C" & LR).value = Sp
 
 
 Call TurnOnStuff
+excelSettingsOff = False
 
 
 AA = fileName(WordCount)
@@ -257,6 +273,16 @@ DirPathGlobal = DirPath
 
 '     Sheets("Measurement_Info").Select
 End If
+    Exit Sub
+
+FatalError:
+    errNumber = Err.Number
+    errDescription = Err.Description
+    On Error Resume Next
+    If Not KPI Is Nothing Then KPI.Close
+    If excelSettingsOff Then TurnOnStuff
+    MsgBox "FourGCov failed while processing:" & vbCrLf & CStr(Fil) & vbCrLf & _
+           "Error " & errNumber & ": " & errDescription, vbExclamation, "FourGCov"
 End Sub
 Sub TurnOffStuff()
     Application.Calculation = xlCalculationManual
@@ -587,8 +613,6 @@ Dim Result As String
     getBand = Result
     
 End Function
-' Helper function to delete a sheet if it exists
-' Returns True if sheet existed and was deleted, False if it didn't exist
 Function DeleteSheetIfExists(sheetName As String) As Boolean
     On Error Resume Next ' Ignore errors if sheet doesn't exist
     Dim ws As Worksheet
@@ -598,10 +622,15 @@ Function DeleteSheetIfExists(sheetName As String) As Boolean
         Application.DisplayAlerts = False ' Prevent confirmation dialog
         ThisWorkbook.Sheets(sheetName).Delete
         Application.DisplayAlerts = True
-        DeleteSheetIfExists = False ' Sheet existed and was deleted
+        DeleteSheetIfExists = True
     Else
-        DeleteSheetIfExists = True ' Sheet didn't exist
+        DeleteSheetIfExists = False
     End If
     
     On Error GoTo 0 ' Reset error handling
+End Function
+Private Function IsPositiveNumber(ByVal valueText As Variant) As Boolean
+    If IsNumeric(valueText) Then
+        IsPositiveNumber = (CDbl(valueText) > 0)
+    End If
 End Function

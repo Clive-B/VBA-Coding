@@ -6,8 +6,8 @@ Option Base 1
 #Else
     Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
-Public DirPathGlobal, workbookPathGlobal, GetKeepZero, GetKeepOne As String
-Public GetSaveZero, GetDayyZero, EndRow, Beginning, Ending, GetTownNameTwo As String
+Public DirPathGlobal As String, workbookPathGlobal As String, GetKeepZero As String, GetKeepOne As String
+Public GetSaveZero As String, GetDayyZero As String, EndRow As String, Beginning As String, Ending As String, GetTownNameTwo As String
 Public prevtownDayKey As Variant ' Declare global variable
 Public prevtown As String ' Declare global variable
 'Sub ThreeGCov(Fil As String)
@@ -18,22 +18,27 @@ Public prevtown As String ' Declare global variable
                Optional location As String = "")
 
 Dim KPI As Scripting.TextStream
-Dim ArryLine, cmrt, Alert, latitude, longitude, Get_date, test_date, CallAttempt, sh, Fgname, Band, Device, ST, Sp As String
+Dim ArryLine As String, cmrt As String, Alert As String, latitude As String, longitude As String, Get_date As String, test_date As String, CallAttempt As String, sh As String, Fgname As String, Band As String, Device As String, ST As String, Sp As String
 Dim Keep() As String
-Dim WordCount As Integer
+Dim WordCount As Long
 Dim CurrentLine() As String
 Dim fileName() As String
 Dim Tdate() As String
 Dim wb As Workbook
 Dim ws As Worksheet
-Dim CurrentRow, Tow, count As Integer
+Dim CurrentRow As Long, Tow As Long, count As Long
 Dim fso As Scripting.FileSystemObject
 Dim oWSHShell As Object
 Dim lRow As Long
+Dim LR As Long
 Dim Dayy() As String
 Dim hasChanged As Boolean
 Dim NameTown As String
 Dim workbookName As String
+Dim excelSettingsOff As Boolean
+Dim errNumber As Long, errDescription As String
+
+On Error GoTo FatalError
 
 Set oWSHShell = CreateObject("WScript.Shell")
 GetDesktop = oWSHShell.SpecialFolders("Desktop")
@@ -66,20 +71,20 @@ If Not IsEmpty(prevtownDayKey) Then
             
             Else
             Application.DisplayAlerts = False
-            ThisWorkbook.Sheets(prevtown).Delete
-            ThisWorkbook.Sheets("AVGCAL").Delete
-            ThisWorkbook.Sheets("FILTERCov").Delete
-            ThisWorkbook.Sheets("AdvFILTERCov").Delete
+            DeleteSheetIfExists prevtown
+            DeleteSheetIfExists "AVGCAL"
+            DeleteSheetIfExists "FILTERCov"
+            DeleteSheetIfExists "AdvFILTERCov"
             Sheets.Add(After:=Sheets(Sheets.count)).Name = "AVGCAL"
             ThisWorkbook.Sheets("AVGCAL").Visible = xlSheetHidden
             Application.DisplayAlerts = True
             End If
             ElseIf CStr(prevtown) = CStr(NameTown) And prevtownDayKey <> townDayKey Then
             Application.DisplayAlerts = False
-            ThisWorkbook.Sheets(prevtown).Delete
-            ThisWorkbook.Sheets("AVGCAL").Delete
-            ThisWorkbook.Sheets("FILTERCov").Delete
-            ThisWorkbook.Sheets("AdvFILTERCov").Delete
+            DeleteSheetIfExists prevtown
+            DeleteSheetIfExists "AVGCAL"
+            DeleteSheetIfExists "FILTERCov"
+            DeleteSheetIfExists "AdvFILTERCov"
             Sheets.Add(After:=Sheets(Sheets.count)).Name = "AVGCAL"
             ThisWorkbook.Sheets("AVGCAL").Visible = xlSheetHidden
             Application.DisplayAlerts = True
@@ -100,6 +105,7 @@ Sheets(sh).Select
 
 CurrentRow = Range("AO1").value
 Call TurnOffStuff
+excelSettingsOff = True
 Do Until KPI.AtEndOfStream
     ArryLine = KPI.ReadLine
      CurrentLine = Split(ArryLine, ",")
@@ -107,31 +113,38 @@ Do Until KPI.AtEndOfStream
      Select Case CurrentLine(0)
      
         Case Is = "#DL"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             Device = CurrentLine(3)
             Keep = Split(CurrentLine(3), " ")
+            If UBound(Keep) < 1 Then GoTo NextLogLine
             Keep(0) = Replace(Keep(0), """", "")
             Keep(1) = Replace(Keep(1), """", "")
             GetKeepOne = Keep(1)
             GetKeepZero = Keep(0)
         Case Is = "#START"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             ST = CurrentLine(1)
             Get_date = Mid(CurrentLine(3), 2, Len(CurrentLine(3)) - 2)
             Tdate = Split(Get_date, ".")
-            test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
+            If UBound(Tdate) >= 2 Then test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
         Case Is = "CELLMEAS"
                 
-                If UBound(CurrentLine) < 10 Or CurrentLine(5) = "0" Then
+                If UBound(CurrentLine) < 14 Or CurrentLine(5) = "0" Then
                 CurrentRow = CurrentRow - 1
                 GoTo CurrentLineIncrement
                 ElseIf CurrentLine(12) = "" Then
                 CurrentRow = CurrentRow - 1
                 GoTo CurrentLineIncrement
-                ElseIf CurrentLine(10) = "1" And CurrentLine(12) = "0" And CurrentLine(3) = "5" Or CurrentLine(3) = "6" Then
-                Range("O" & CurrentRow) = CurrentLine(18)
-                ElseIf CurrentLine(6) <> 3 Then
+                ElseIf CurrentLine(10) = "1" And CurrentLine(12) = "0" And (CurrentLine(3) = "5" Or CurrentLine(3) = "6") Then
+                If UBound(CurrentLine) < 18 Then
                 CurrentRow = CurrentRow - 1
                 GoTo CurrentLineIncrement
-                ElseIf CurrentLine(11) <= 0 Then
+                End If
+                Range("O" & CurrentRow) = CurrentLine(18)
+                ElseIf CurrentLine(6) <> "3" Then
+                CurrentRow = CurrentRow - 1
+                GoTo CurrentLineIncrement
+                ElseIf Not IsPositiveNumber(CurrentLine(11)) Then
                 CurrentRow = CurrentRow - 1
                 GoTo CurrentLineIncrement
                 ElseIf CurrentLine(3) = "5" Or CurrentLine(3) = "6" Then
@@ -154,19 +167,23 @@ Do Until KPI.AtEndOfStream
 CurrentLineIncrement:
                 CurrentRow = CurrentRow + 1
         Case Is = "GPS"
+            If UBound(CurrentLine) < 4 Then GoTo NextLogLine
             longitude = CurrentLine(3)
             latitude = CurrentLine(4)
             
         Case Is = "SEI"
+            If UBound(CurrentLine) < 7 Then GoTo NextLogLine
             MCC = CurrentLine(6)
             MNC = CurrentLine(7)
         
         Case Is = "#STOP"
+            If UBound(CurrentLine) < 1 Then GoTo NextLogLine
             Sp = CurrentLine(1)
             
             Exit Do
     
     End Select
+NextLogLine:
     
 Loop
 
@@ -188,6 +205,7 @@ Worksheets("Measurement_Info").Range("C" & LR).value = Sp
 'Sheets("Measurement_Info").Columns(3).NumberFormat = "hh:mm:ss.000"
 
 Call TurnOnStuff
+excelSettingsOff = False
     
     AA = fileName(WordCount)
     Name = Split(AA, " ")
@@ -262,7 +280,17 @@ End If
 'End If
      'ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & "NCA\" & Keep(0) & "\COVERAGE\" & Keep(0) & " " & FileName(1) & " " & Keep(1) & " COVERAGE" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
 
-End Sub
+    Exit Sub
+
+FatalError:
+    errNumber = Err.Number
+    errDescription = Err.Description
+    On Error Resume Next
+    If Not KPI Is Nothing Then KPI.Close
+    If excelSettingsOff Then TurnOnStuff
+    MsgBox "ThreeGCov failed while processing:" & vbCrLf & CStr(Fil) & vbCrLf & _
+           "Error " & errNumber & ": " & errDescription, vbExclamation, "ThreeGCov"
+ End Sub
 Function getmax(arrayB As String) As String
     Dim arrayspace As Long, count As Long
     count = 0
@@ -365,6 +393,22 @@ Sub TurnOnStuff()
     Application.ScreenUpdating = True
     Application.EnableEvents = True
 End Sub
+Private Sub DeleteSheetIfExists(ByVal sheetName As String)
+    Dim ws As Worksheet
+
+    On Error Resume Next
+    Set ws = ThisWorkbook.Sheets(sheetName)
+    On Error GoTo 0
+
+    If Not ws Is Nothing Then
+        ThisWorkbook.Sheets(sheetName).Delete
+    End If
+End Sub
+Private Function IsPositiveNumber(ByVal valueText As Variant) As Boolean
+    If IsNumeric(valueText) Then
+        IsPositiveNumber = (CDbl(valueText) > 0)
+    End If
+End Function
 Public Function CollectionToArray(myCol As Collection) As Variant
 
     Dim Result  As Variant

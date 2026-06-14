@@ -46,6 +46,8 @@ Sub ProcessCovFiles()
     Dim townDayKey As String
     Dim fileList As Collection
     Dim wb As Workbook
+    Dim openedWorkbook As Workbook
+    Dim techType As String
 
     ' Initialize file tracking
     InitializeFileTracking
@@ -63,6 +65,8 @@ Sub ProcessCovFiles()
         workbookPath = GetDesktop & "QoS Automation\Templates\RSCP Template.xlsm"
         
         NetworkCurr = element
+        If Not fso.FolderExists(folderPath) Then GoTo NextElement
+
         Set folder = fso.GetFolder(folderPath)
         Set townDateDict = CreateObject("Scripting.Dictionary")
         Set fileList = New Collection
@@ -74,7 +78,7 @@ Sub ProcessCovFiles()
         
         NextworkbookPath
         Sleep 3000
-        Workbooks.Open workbookPath
+        Set openedWorkbook = Workbooks.Open(workbookPath)
 
         ' Group files by town + date in their natural order
         For Each fileItem In fileList
@@ -98,7 +102,7 @@ Sub ProcessCovFiles()
             End If
         Next fileItem
 
-        For passNumber = 1 To 2
+        For passNumber = 1 To 1
             For Each townDateKey In townDateDict.Keys
                 Set T3GFiles = New Collection
                 Set T4GFiles = New Collection
@@ -127,28 +131,17 @@ Sub ProcessCovFiles()
                     ' Process files in their natural order
                     For Each fileItem In townDateDict(townDateKey)(locKey)
                         filePath = CStr(fileItem)
-                        Set KPI = fso.OpenTextFile(filePath)
-                        Do Until KPI.AtEndOfStream
-                            ArryLine = KPI.ReadLine
-                            CurrentLine = Split(ArryLine, ",")
-                            If UBound(CurrentLine) >= 3 And CurrentLine(0) = "#DL" Then
-                                Keep = Split(CurrentLine(3), " ")
-                                If UBound(Keep) >= 1 Then
-                                    Keep(1) = Replace(Keep(1), """", "")
-                                End If
-                            End If
-                        Loop
-                        KPI.Close
+                        techType = GetCoverageTech(filePath, fso)
 
-                        If UBound(Keep) >= 1 Then
-                            If Keep(1) = "3G" Then
-                                keepOne = Keep(1)
+                        If techType <> "" Then
+                            If techType = "3G" Then
+                                keepOne = techType
                                 T3GFiles.Add filePath
                                 If Not fileDict.Exists("3G") Then
                                     fileDict.Add "3G", New Collection
                                 End If
                                 fileDict("3G").Add filePath
-                            ElseIf Keep(1) = "4G" Then
+                            ElseIf techType = "4G" Then
                                 T4GFiles.Add filePath
                                 If Not fileDict.Exists("4G") Then
                                     fileDict.Add "4G", New Collection
@@ -166,7 +159,7 @@ Sub ProcessCovFiles()
                         For Each fileItem In fileDict("3G")
                             filePath = fileItem
                             isLastInLocation = (filePath = lastLocFile)
-                            workbookPath = FindworkbookPath()
+                            workbookPath = openedWorkbook.FullName
                             Runn = Split(CStr(locKey), "CST")
                             Slow = Split(Runn(1), ".")
                             GetDay = Slow(0)
@@ -209,6 +202,7 @@ Sub ProcessCovFiles()
         Set folder = Nothing
         Set townDateDict = Nothing
         Set fileList = Nothing
+NextElement:
     Next element
     
     On Error Resume Next ' Handle errors if workbook isn't found
@@ -247,6 +241,8 @@ Sub Process4GCovFiles()
     Dim townDayKey As String
     Dim Trance As String
     Dim fileList As Collection
+    Dim openedWorkbook As Workbook
+    Dim techType As String
 
     ' Initialize file tracking
     InitializeFileTracking
@@ -264,6 +260,8 @@ Sub Process4GCovFiles()
         workbookPath = GetDesktop & "QoS Automation\Templates\RSRP Template.xlsm"
         
         NetworkCurr = element
+        If Not fso.FolderExists(folderPath) Then GoTo Next4GElement
+
         Set folder = fso.GetFolder(folderPath)
         Set townDateDict = CreateObject("Scripting.Dictionary")
         Set fileList = New Collection
@@ -275,7 +273,7 @@ Sub Process4GCovFiles()
         
         NextworkbookPath
         Sleep 3000
-        Workbooks.Open workbookPath
+        Set openedWorkbook = Workbooks.Open(workbookPath)
 
         ' Group files by town + date in their natural order
         For Each fileItem In fileList
@@ -299,7 +297,7 @@ Sub Process4GCovFiles()
             End If
         Next fileItem
 
-        For passNumber = 1 To 2
+        For passNumber = 1 To 1
             For Each townDateKey In townDateDict.Keys
                 Set T3GFiles = New Collection
                 Set T4GFiles = New Collection
@@ -328,28 +326,17 @@ Sub Process4GCovFiles()
                     ' Process files in their natural order
                     For Each fileItem In townDateDict(townDateKey)(locKey)
                         filePath = CStr(fileItem)
-                        Set KPI = fso.OpenTextFile(filePath)
-                        Do Until KPI.AtEndOfStream
-                            ArryLine = KPI.ReadLine
-                            CurrentLine = Split(ArryLine, ",")
-                            If UBound(CurrentLine) >= 3 And CurrentLine(0) = "#DL" Then
-                                Keep = Split(CurrentLine(3), " ")
-                                If UBound(Keep) >= 1 Then
-                                    Keep(1) = Replace(Keep(1), """", "")
-                                End If
-                            End If
-                        Loop
-                        KPI.Close
+                        techType = GetCoverageTech(filePath, fso)
 
-                        If UBound(Keep) >= 1 Then
-                            If Keep(1) = "3G" Then
+                        If techType <> "" Then
+                            If techType = "3G" Then
                                 T3GFiles.Add filePath
                                 If Not fileDict.Exists("3G") Then
                                     fileDict.Add "3G", New Collection
                                 End If
                                 fileDict("3G").Add filePath
-                            ElseIf Keep(1) = "4G" Then
-                                keepOne = Keep(1)
+                            ElseIf techType = "4G" Then
+                                keepOne = techType
                                 Trance = ExtractFileName(filePath)
                                 T4GFiles.Add filePath
                                 If Not fileDict.Exists("4G") Then
@@ -389,7 +376,7 @@ Sub Process4GCovFiles()
                         For Each fileItem In fileDict("4G")
                             filePath = fileItem
                             isLastInLocation = (filePath = lastLocFile)
-                            workbookPath = FindworkbookPath()
+                            workbookPath = openedWorkbook.FullName
                             Runn = Split(CStr(locKey), "CST")
                             Slow = Split(Runn(1), ".")
                             GetDay = Slow(0)
@@ -414,6 +401,7 @@ Sub Process4GCovFiles()
         Set folder = Nothing
         Set townDateDict = Nothing
         Set fileList = Nothing
+Next4GElement:
     Next element
 
     Set fso = Nothing
@@ -505,6 +493,33 @@ Function ExtractTime(fileName As String) As String
     Else
         ExtractTime = "000000"
     End If
+End Function
+
+Private Function GetCoverageTech(ByVal filePath As String, ByVal fso As Object) As String
+    Dim KPI As Object
+    Dim ArryLine As String
+    Dim CurrentLine() As String
+    Dim Keep() As String
+
+    On Error GoTo CleanUp
+    Set KPI = fso.OpenTextFile(filePath)
+    Do Until KPI.AtEndOfStream
+        ArryLine = KPI.ReadLine
+        CurrentLine = Split(ArryLine, ",")
+        If UBound(CurrentLine) >= 3 Then
+            If CurrentLine(0) = "#DL" Then
+                Keep = Split(CurrentLine(3), " ")
+                If UBound(Keep) >= 1 Then
+                    GetCoverageTech = UCase$(Replace(Keep(1), """", ""))
+                    Exit Do
+                End If
+            End If
+        End If
+    Loop
+
+CleanUp:
+    On Error Resume Next
+    If Not KPI Is Nothing Then KPI.Close
 End Function
 
 Sub NextworkbookPath()
