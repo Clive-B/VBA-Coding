@@ -35,6 +35,8 @@ Sub ProcessDataFiles()
     Dim townDayKey As String
     Dim fileList As Collection
     Dim hasMultipleTimes As Boolean
+    Dim openedWorkbook As Workbook
+    Dim techType As String
 
     ' Initialize file tracking
     InitializeFileTracking
@@ -51,6 +53,8 @@ Sub ProcessDataFiles()
         folderPath = GetDesktop & "QoS Automation\" & Trends & "\Telcos\" & element & "\DATA\LOGS"
         workbookPath = GetDesktop & "QoS Automation\Templates\3G Data Template.xlsm"
         
+        If Not fso.FolderExists(folderPath) Then GoTo NextElement
+
         Set folder = fso.GetFolder(folderPath)
         Set townDateDict = CreateObject("Scripting.Dictionary")
         Set fileList = New Collection
@@ -62,7 +66,7 @@ Sub ProcessDataFiles()
         
         NextworkbookPath
         Sleep 3000
-        Workbooks.Open workbookPath
+        Set openedWorkbook = Workbooks.Open(workbookPath)
 
         ' Group files by town + date in their natural order
         For Each fileItem In fileList
@@ -86,7 +90,7 @@ Sub ProcessDataFiles()
             End If
         Next fileItem
 
-        For passNumber = 1 To 2
+        For passNumber = 1 To 1
             For Each townDateKey In townDateDict.Keys
                 Set T3GFiles = New Collection
                 Set T4GFiles = New Collection
@@ -115,27 +119,16 @@ Sub ProcessDataFiles()
                     ' Process files in their natural order
                     For Each fileItem In townDateDict(townDateKey)(locKey)
                         filePath = CStr(fileItem)
-                        Set KPI = fso.OpenTextFile(filePath)
-                        Do Until KPI.AtEndOfStream
-                            ArryLine = KPI.ReadLine
-                            CurrentLine = Split(ArryLine, ",")
-                            If UBound(CurrentLine) >= 3 And CurrentLine(0) = "#DL" Then
-                                Keep = Split(CurrentLine(3), " ")
-                                If UBound(Keep) >= 1 Then
-                                    Keep(1) = Replace(Keep(1), """", "")
-                                End If
-                            End If
-                        Loop
-                        KPI.Close
+                        techType = GetDataTech(filePath, fso)
 
-                        If UBound(Keep) >= 1 Then
-                            If Keep(1) = "3G" Then
+                        If techType <> "" Then
+                            If techType = "3G" Then
                                 T3GFiles.Add filePath
                                 If Not fileDict.Exists("3G") Then
                                     fileDict.Add "3G", New Collection
                                 End If
                                 fileDict("3G").Add filePath
-                            ElseIf Keep(1) = "4G" Then
+                            ElseIf techType = "4G" Then
                                 T4GFiles.Add filePath
                                 If Not fileDict.Exists("4G") Then
                                     fileDict.Add "4G", New Collection
@@ -153,7 +146,7 @@ Sub ProcessDataFiles()
                         For Each fileItem In fileDict("3G")
                             filePath = fileItem
                             isLastInLocation = (filePath = lastLocFile)
-                            workbookPath = FindworkbookPath()
+                            workbookPath = openedWorkbook.FullName
                             FinalTime3G = IsLastFileForTownDay(filePath, fso, "3G")
                             ' Process each file in its original order
                             NameTown = town
@@ -191,10 +184,10 @@ Sub ProcessDataFiles()
         ' Cleanup between elements
         NextworkbookPath
         Sleep 3000
-        Workbooks.Open workbookPath
         Set folder = Nothing
         Set townDateDict = Nothing
         Set fileList = Nothing
+NextElement:
     Next element
     
     On Error Resume Next ' Handle errors if workbook isn't found
@@ -231,6 +224,8 @@ Sub Process4GDataFiles()
     Dim townDayKey As String
     Dim DupBreak As String
     Dim fileList As Collection
+    Dim openedWorkbook As Workbook
+    Dim techType As String
 
     ' Initialize file tracking
     InitializeFileTracking
@@ -247,6 +242,8 @@ Sub Process4GDataFiles()
         folderPath = GetDesktop & "QoS Automation\" & Trends & "\Telcos\" & element & "\DATA\LOGS"
         workbookPath = GetDesktop & "QoS Automation\Templates\4G Data Template.xlsm"
         
+        If Not fso.FolderExists(folderPath) Then GoTo Next4GElement
+
         Set folder = fso.GetFolder(folderPath)
         Set townDateDict = CreateObject("Scripting.Dictionary")
         Set fileList = New Collection
@@ -258,7 +255,7 @@ Sub Process4GDataFiles()
         
         NextworkbookPath
         Sleep 3000
-        Workbooks.Open workbookPath
+        Set openedWorkbook = Workbooks.Open(workbookPath)
 
         ' Group files by town + date in their natural order
         For Each fileItem In fileList
@@ -282,7 +279,7 @@ Sub Process4GDataFiles()
             End If
         Next fileItem
 
-        For passNumber = 1 To 2
+        For passNumber = 1 To 1
             For Each townDateKey In townDateDict.Keys
                 Set T3GFiles = New Collection
                 Set T4GFiles = New Collection
@@ -311,27 +308,16 @@ Sub Process4GDataFiles()
                     ' Process files in their natural order
                     For Each fileItem In townDateDict(townDateKey)(locKey)
                         filePath = CStr(fileItem)
-                        Set KPI = fso.OpenTextFile(filePath)
-                        Do Until KPI.AtEndOfStream
-                            ArryLine = KPI.ReadLine
-                            CurrentLine = Split(ArryLine, ",")
-                            If UBound(CurrentLine) >= 3 And CurrentLine(0) = "#DL" Then
-                                Keep = Split(CurrentLine(3), " ")
-                                If UBound(Keep) >= 1 Then
-                                    Keep(1) = Replace(Keep(1), """", "")
-                                End If
-                            End If
-                        Loop
-                        KPI.Close
+                        techType = GetDataTech(filePath, fso)
 
-                        If UBound(Keep) >= 1 Then
-                            If Keep(1) = "3G" Then
+                        If techType <> "" Then
+                            If techType = "3G" Then
                                 T3GFiles.Add filePath
                                 If Not fileDict.Exists("3G") Then
                                     fileDict.Add "3G", New Collection
                                 End If
                                 fileDict("3G").Add filePath
-                            ElseIf Keep(1) = "4G" Then
+                            ElseIf techType = "4G" Then
                                 T4GFiles.Add filePath
                                 If Not fileDict.Exists("4G") Then
                                     fileDict.Add "4G", New Collection
@@ -369,7 +355,7 @@ Sub Process4GDataFiles()
                         For Each fileItem In fileDict("4G")
                             filePath = fileItem
                             isLastInLocation = (filePath = lastLocFile)
-                            workbookPath = FindworkbookPath()
+                            workbookPath = openedWorkbook.FullName
                             FinalTime4G = IsLastFileForTownDay(filePath, fso, "4G")
                             NameTown = town
                             fileName = fso.GetFileName(fileItem)
@@ -392,10 +378,10 @@ Sub Process4GDataFiles()
         ' Cleanup between elements
         NextworkbookPath
         Sleep 3000
-        Workbooks.Open workbookPath
         Set folder = Nothing
         Set townDateDict = Nothing
         Set fileList = Nothing
+Next4GElement:
     Next element
 
     Set fso = Nothing
@@ -497,6 +483,33 @@ Function ExtractTime(fileName As String) As String
     Else
         ExtractTime = "000000"
     End If
+End Function
+
+Private Function GetDataTech(ByVal filePath As String, ByVal fso As Object) As String
+    Dim KPI As Object
+    Dim ArryLine As String
+    Dim CurrentLine() As String
+    Dim Keep() As String
+
+    On Error GoTo CleanUp
+    Set KPI = fso.OpenTextFile(filePath)
+    Do Until KPI.AtEndOfStream
+        ArryLine = KPI.ReadLine
+        CurrentLine = Split(ArryLine, ",")
+        If UBound(CurrentLine) >= 3 Then
+            If CurrentLine(0) = "#DL" Then
+                Keep = Split(CurrentLine(3), " ")
+                If UBound(Keep) >= 1 Then
+                    GetDataTech = UCase$(Replace(Keep(1), """", ""))
+                    Exit Do
+                End If
+            End If
+        End If
+    Loop
+
+CleanUp:
+    On Error Resume Next
+    If Not KPI Is Nothing Then KPI.Close
 End Function
 
 Sub NextworkbookPath()

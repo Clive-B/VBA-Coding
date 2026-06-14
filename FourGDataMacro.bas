@@ -5,8 +5,8 @@ Attribute VB_Name = "FourGDataMacro"
 #Else
     Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
-Public DirPathGlobal, workbookPathGlobal, GetKeepZero, GetKeepOne As String
-Public GetSaveZero, GetDayyZero, endRow, Beginning, BeginningHttp, BeginningFtp, Ending, EndingHttp, EndingFtp, GetTownNameTwo As String
+Public DirPathGlobal As String, workbookPathGlobal As String, GetKeepZero As String, GetKeepOne As String
+Public GetSaveZero As String, GetDayyZero As String, endRow As String, Beginning As String, BeginningHttp As String, BeginningFtp As String, Ending As String, EndingHttp As String, EndingFtp As String, GetTownNameTwo As String
 Public prevlocKey As Variant ' Declare global variable
 Public prevtown, PrevFileDate, PrevlocationName, PrevDupBreak As String ' Declare global variable
 Sub FourGData(Fil As String, DupBreak As String, LogfileName As String, locationName As String, fileDate As String, DirPath As String, Finish As Boolean, _
@@ -16,11 +16,11 @@ Sub FourGData(Fil As String, DupBreak As String, LogfileName As String, location
                Optional location As String = "")
 
 Dim KPI As Scripting.TextStream
-Dim ArryLine, latitude, longitude, Get_date, test_date, sh, Fgname As String
+Dim ArryLine As String, latitude As String, longitude As String, Get_date As String, test_date As String, sh As String, Fgname As String
 Dim CurrentLine() As String
 Dim fileName() As String
 Dim Tdate() As String
-Dim CurrentRowFtp, CurrentRowHttp, CurrentRow, CurrentRowCov, WordCount, WS_Count As Integer
+Dim CurrentRowFtp As Long, CurrentRowHttp As Long, CurrentRow As Long, CurrentRowCov As Long, WordCount As Long, WS_Count As Long
 Dim fso As Scripting.FileSystemObject
 Dim lRow As Long
 Dim oWSHShell As Object
@@ -30,14 +30,31 @@ Dim Dayy() As String
 Dim GetSaveName() As String
 Dim hasChanged As Boolean
 Dim NameTown As String
-Dim cellValue, cellValueHttp, cellValueFTP As String
-Dim numberValue, numberValueHttp, numberValueFTP As Long
-Dim Count As Integer
+Dim cellValue As String, cellValueHttp As String, cellValueFTP As String
+Dim numberValue As Long, numberValueHttp As Long, numberValueFTP As Long
+Dim Count As Long
 Dim cellVal As Variant
 Dim firstUnusedRow As Long
 Dim LastUsedRow As Long
 Dim firstFreeRow As Long
 Dim LastOccupiedRow As Long
+Dim excelSettingsOff As Boolean
+Dim errNumber As Long, errDescription As String
+Dim i As Long
+Dim isSame As Boolean
+Dim ws As Worksheet
+Dim AA As String
+Dim lastRow As Long
+Dim SpotNum As String
+Dim Band As String
+Dim Device As String
+Dim ST As String
+Dim Sp As String
+Dim MCC As String
+Dim MNC As String
+Dim spotName As String
+
+On Error GoTo FatalError
 
 NameTown = Application.Run("'QoS.xlsm'!GetPublicVar")
 
@@ -54,7 +71,7 @@ Fgname = Fil
 Set ws = ThisWorkbook.Worksheets("Logs") ' Or Worksheets(1)
 
 ' Method 1: Find last used row in the entire sheet (most reliable)
-LastOccupiedRow = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).row
+LastOccupiedRow = LastUsedRowInSheet(ws)
 
 ' Method 2: Alternative for last used row in specific column (e.g., Column A)
 ' lastUsedRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -95,7 +112,7 @@ If Not IsEmpty(prevlocKey) Then
             Set ws = ThisWorkbook.Worksheets("Locations") ' Or Worksheets(1)
 
             ' Method 1: Find last used row in the entire sheet (most reliable)
-            LastUsedRow = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).row
+            LastUsedRow = LastUsedRowInSheet(ws)
 
             ' Method 2: Alternative for last used row in specific column (e.g., Column A)
             ' lastUsedRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -194,6 +211,7 @@ CurrentRowCov = Sheets("LTE_4GIDLE_MultiMetric_5").Range("AO1")
 Sheets("Measurement_Info").Select
 
 Call TurnOffStuff
+excelSettingsOff = True
 Do Until KPI.AtEndOfStream
     ArryLine = KPI.ReadLine
      CurrentLine = Split(ArryLine, ",")
@@ -202,19 +220,23 @@ Do Until KPI.AtEndOfStream
      Select Case CurrentLine(0)
      
         Case Is = "#DL"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             Device = CurrentLine(3)
             Keep = Split(CurrentLine(3), " ")
+            If UBound(Keep) < 1 Then GoTo NextLogLine
             Keep(0) = Replace(Keep(0), """", "")
             Keep(1) = Replace(Keep(1), """", "")
             GetKeepOne = Keep(1)
             GetKeepZero = Keep(0)
         Case Is = "#START"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             ST = CurrentLine(1)
             Get_date = Mid(CurrentLine(3), 2, Len(CurrentLine(3)) - 2)
             Tdate = Split(Get_date, ".")
-            test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
+            If UBound(Tdate) >= 2 Then test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
         Case Is = "DRATE"
             
+            If UBound(CurrentLine) < 6 Then GoTo NextLogLine
             If CurrentLine(4) = "3" Then
                 Sheets("FTPThroughput").Select
                 Sheets("FTPThroughput").Range("K" & CurrentRowFtp) = test_date
@@ -227,6 +249,7 @@ Do Until KPI.AtEndOfStream
             
         Case Is = "DREQ"
         
+            If UBound(CurrentLine) < 5 Then GoTo NextLogLine
             If CurrentLine(5) = "3" Then
                 Sheets("FTPThroughput").Select
                 Sheets("FTPThroughput").Range("K" & CurrentRowFtp) = test_date
@@ -239,6 +262,7 @@ Do Until KPI.AtEndOfStream
             
         Case Is = "DCOMP"
             
+            If UBound(CurrentLine) < 5 Then GoTo NextLogLine
             If CurrentLine(4) = "3" Then
                 Sheets("FTPThroughput").Select
                 Sheets("FTPThroughput").Range("K" & CurrentRowFtp) = test_date
@@ -249,6 +273,7 @@ Do Until KPI.AtEndOfStream
                 CurrentRowFtp = CurrentRowFtp + 1
                 
             ElseIf (CurrentLine(4) = "4" Or CurrentLine(4) = "11") And CurrentLine(5) = "1" Then
+                If UBound(CurrentLine) < 15 Then GoTo NextLogLine
                 If CurrentLine(14) <> "" And CurrentLine(15) <> "" Then
                     Sheets("HTTPIPServiceSetupTime").Select
                     Sheets("HTTPIPServiceSetupTime").Range("K" & CurrentRowHttp) = test_date
@@ -263,6 +288,7 @@ Do Until KPI.AtEndOfStream
         
         Case Is = "RTT"
             
+            If UBound(CurrentLine) < 6 Then GoTo NextLogLine
             If CurrentLine(4) = "12" Then
                 Sheets("Ping").Select
                 Sheets("Ping").Range("K" & CurrentRow) = test_date
@@ -275,12 +301,14 @@ Do Until KPI.AtEndOfStream
             
             
         Case Is = "CELLMEAS"
-                If CurrentLine(3) = 7 Or CurrentLine(3) = 8 And CurrentLine(4) = 0 And CurrentLine(5) > 0 Then  'checking for LTE technology
+                If UBound(CurrentLine) < 12 Then
+                CurrentRowCov = CurrentRowCov - 1
+                GoTo CurrentLineIncrement
+                End If
+
+                If (CurrentLine(3) = "7" Or CurrentLine(3) = "8") And CurrentLine(4) = "0" And IsPositiveNumber(CurrentLine(5)) Then  'checking for LTE technology
                     
-                    If UBound(CurrentLine) < 7 Then
-                    CurrentRowCov = CurrentRowCov - 1
-                    GoTo CurrentLineIncrement
-                    ElseIf CurrentLine(7) = 0 Then
+                    If CurrentLine(7) = "0" Then
                     Sheets("LTE_4GIDLE_MultiMetric_5").Range("K" & CurrentRowCov) = CurrentLine(1)
                     Sheets("LTE_4GIDLE_MultiMetric_5").Range("L" & CurrentRowCov) = test_date
                     Sheets("LTE_4GIDLE_MultiMetric_5").Range("M" & CurrentRowCov) = latitude
@@ -291,6 +319,9 @@ Do Until KPI.AtEndOfStream
                     Sheets("LTE_4GIDLE_MultiMetric_5").Range("R" & CurrentRowCov) = MCC
                     Band = CurrentLine(8)
                     Sheets("LTE_4GIDLE_MultiMetric_5").Range("S" & CurrentRowCov) = getBand((Band))
+                    Else
+                    CurrentRowCov = CurrentRowCov - 1
+                    GoTo CurrentLineIncrement
                     End If
                 
                 Else
@@ -301,19 +332,23 @@ CurrentLineIncrement:
                 CurrentRowCov = CurrentRowCov + 1
             
         Case Is = "SEI"
+            If UBound(CurrentLine) < 7 Then GoTo NextLogLine
             MCC = CurrentLine(6)
             MNC = CurrentLine(7)
         
         Case Is = "GPS"
+            If UBound(CurrentLine) < 4 Then GoTo NextLogLine
             longitude = CurrentLine(3)
             latitude = CurrentLine(4)
             
         Case Is = "#STOP"
+            If UBound(CurrentLine) < 1 Then GoTo NextLogLine
     
             Sp = CurrentLine(1)
             Exit Do
     
     End Select
+NextLogLine:
     
     
 Loop
@@ -344,7 +379,7 @@ Sheets("LTE_4GIDLE_MultiMetric_5").Range("AO1") = CurrentRowCov
 
 Sheets("Measurement_Info").Select
 
-    If Keep(1) = "4G" Then
+    If KeepValue(Keep, 1) = "4G" Then
     Sheets("Measurement_Info").Select
     lastRow = Cells(rows.Count, "A").End(xlUp).row
     lastRow = lastRow + 1
@@ -382,6 +417,7 @@ Sheets("Measurement_Info").Select
     
 
 Call TurnOnStuff
+excelSettingsOff = False
 
     DirPathGlobal = DirPath
 
@@ -390,7 +426,7 @@ Call TurnOnStuff
         Set ws = ThisWorkbook.Worksheets("Locations") ' Or Worksheets(1)
         
         ' Method 1: Find last used row in the entire sheet (most reliable)
-        LastUsedRow = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).row
+        LastUsedRow = LastUsedRowInSheet(ws)
         
         ' Method 2: Alternative for last used row in specific column (e.g., Column A)
         ' lastUsedRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -436,7 +472,7 @@ Call TurnOnStuff
         Sheets("Locations").Range("G" & firstUnusedRow) = BeginningFtp
         Sheets("Locations").Range("H" & firstUnusedRow) = numberValueFTP - 1
         CreateSpotSheets
-        Worksheets("Measurement_Info").Range("A" & (lastRow + 1)).value = TownName(2) & " " & Keep(1) & " " & "DATA" & Dayy(0)
+        Worksheets("Measurement_Info").Range("A" & (lastRow + 1)).value = TownName(2) & " " & KeepValue(Keep, 1) & " " & "DATA" & Dayy(0)
         
         ' Set the target worksheet
         Set ws = ThisWorkbook.Sheets("Measurement_Info")
@@ -445,7 +481,7 @@ Call TurnOnStuff
         ws.Range("F" & (lastRow + 1)).Formula = "=AVERAGE(Ping!O:O)"
         ws.Range("G" & (lastRow + 1)).Formula = "=AVERAGE(HTTPIPServiceSetupTime!O:O)"
         ws.Range("H" & (lastRow + 1)).Formula = "=AVERAGE(FTPThroughput!Q:Q)"
-        ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & Keep(0) & "\DATA\" & Keep(0) & " " & TownName(2) & " " & Keep(1) & " " & "DATA" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
+        ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & KeepValue(Keep, 0) & "\DATA\" & KeepValue(Keep, 0) & " " & TownName(2) & " " & KeepValue(Keep, 1) & " " & "DATA" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
         CopyARFCNChannels
         Sleep 3000  ' 3 second delay
         SaveTelcoWorkbook
@@ -458,8 +494,6 @@ Call TurnOnStuff
         Ending = CurrentRow
         EndingHttp = CurrentRowHttp
         EndingFtp = CurrentRowFtp
-        
-        Dim spotName As String
         
         Set ws = ThisWorkbook.Sheets("Locations")
         
@@ -554,6 +588,16 @@ Call TurnOnStuff
 
     'ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & Keep(0) & " " & Name(0) & " " & Keep(1) & " " & "DATA" & " " & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
 '    ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & Keep(0) & Name(0) & " " & Keep(1) & " " & "DATA" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
+    Exit Sub
+
+FatalError:
+    errNumber = Err.Number
+    errDescription = Err.Description
+    On Error Resume Next
+    If Not KPI Is Nothing Then KPI.Close
+    If excelSettingsOff Then TurnOnStuff
+    MsgBox "FourGData failed while processing:" & vbCrLf & CStr(Fil) & vbCrLf & _
+           "Error " & errNumber & ": " & errDescription, vbExclamation, "FourGData"
 End Sub
 
 Sub TurnOffStuff()
@@ -896,13 +940,40 @@ Function DeleteSheetIfExists(sheetName As String) As Boolean
         Application.DisplayAlerts = False ' Prevent confirmation dialog
         ThisWorkbook.Sheets(sheetName).Delete
         Application.DisplayAlerts = True
-        DeleteSheetIfExists = False ' Sheet existed and was deleted
+        DeleteSheetIfExists = True
     Else
-        DeleteSheetIfExists = True ' Sheet didn't exist
+        DeleteSheetIfExists = False
     End If
     
     On Error GoTo 0 ' Reset error handling
 End Function
+Private Function LastUsedRowInSheet(ByVal ws As Worksheet) As Long
+    Dim foundCell As Range
+
+    Set foundCell = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    If foundCell Is Nothing Then
+        LastUsedRowInSheet = 1
+    Else
+        LastUsedRowInSheet = foundCell.row
+    End If
+End Function
+
+Private Function IsPositiveNumber(ByVal valueText As Variant) As Boolean
+    If IsNumeric(valueText) Then
+        IsPositiveNumber = (CDbl(valueText) > 0)
+    End If
+End Function
+
+Private Function KeepValue(ByRef Keep() As String, ByVal index As Long) As String
+    On Error GoTo Missing
+    If index >= LBound(Keep) And index <= UBound(Keep) Then
+        KeepValue = Keep(index)
+    End If
+    Exit Function
+Missing:
+    KeepValue = ""
+End Function
+
 Private Function SheetExists(ByVal sheetName As String) As Boolean
     Dim sh As Worksheet
 

@@ -5,8 +5,8 @@ Attribute VB_Name = "ThreeGDataMacro"
 #Else
     Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
-Public DirPathGlobal, workbookPathGlobal, GetKeepZero, GetKeepOne As String
-Public GetSaveZero, GetDayyZero, endRow, Beginning, Ending, GetTownNameTwo As String
+Public DirPathGlobal As String, workbookPathGlobal As String, GetKeepZero As String, GetKeepOne As String
+Public GetSaveZero As String, GetDayyZero As String, endRow As String, Beginning As String, Ending As String, GetTownNameTwo As String
 Public prevlocKey As Variant ' Declare global variable
 Public prevtown, PrevFileDate, PrevlocationName, PrevDupBreak As String ' Declare global variable
 'Sub ThreeGData(Fil As String)
@@ -18,7 +18,7 @@ Sub ThreeGData(Fil As String, DupBreak As String, LogfileName As String, locatio
                Optional location As String = "")
 
 Dim KPI As Scripting.TextStream
-Dim ArryLine, latitude, longitude, Get_date, test_date, sh, dh, hh, Fgname As String
+Dim ArryLine As String, latitude As String, longitude As String, Get_date As String, test_date As String, sh As String, dh As String, hh As String, Fgname As String
 Dim SpotNum As String
 Dim Keep() As String
 Dim CurrentLine() As String
@@ -31,9 +31,9 @@ Dim GetSaveName() As String
 Dim Tdate() As String
 Dim wb As Workbook
 Dim ws As Worksheet
-Dim CurrentRow, Tow, WordCount As Integer
+Dim CurrentRow As Long, Tow As Long, WordCount As Long
 Dim ThrputArray(50000) As Variant
-Dim i As Integer
+Dim i As Long
 Dim fso As Scripting.FileSystemObject
 Dim lRow As Long
 Dim oWSHShell As Object
@@ -42,12 +42,21 @@ Dim isSame As Boolean
 Dim NameTown As String
 Dim cellValue As String
 Dim numberValue As Long
-Dim Count As Integer
+Dim Count As Long
 Dim cellVal As Variant
 Dim firstUnusedRow As Long
 Dim LastUsedRow As Long
 Dim firstFreeRow As Long
 Dim LastOccupiedRow As Long
+Dim excelSettingsOff As Boolean
+Dim errNumber As Long, errDescription As String
+Dim lastRow As Long
+Dim AA As String
+Dim Total As Double, Average As Double
+Dim j As Long
+Dim spotName As String
+
+On Error GoTo FatalError
 
 
 NameTown = Application.Run("'QoS.xlsm'!GetPublicVar")
@@ -68,7 +77,7 @@ Fgname = Fil
 Set ws = ThisWorkbook.Worksheets("Logs") ' Or Worksheets(1)
 
 ' Method 1: Find last used row in the entire sheet (most reliable)
-LastOccupiedRow = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).row
+LastOccupiedRow = LastUsedRowInSheet(ws)
 
 ' Method 2: Alternative for last used row in specific column (e.g., Column A)
 ' lastUsedRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -108,7 +117,7 @@ If Not IsEmpty(prevlocKey) Then
             Set ws = ThisWorkbook.Worksheets("Locations") ' Or Worksheets(1)
 
             ' Method 1: Find last used row in the entire sheet (most reliable)
-            LastUsedRow = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).row
+            LastUsedRow = LastUsedRowInSheet(ws)
 
             ' Method 2: Alternative for last used row in specific column (e.g., Column A)
             ' lastUsedRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -191,6 +200,7 @@ Sheets(sh).Select
 
 CurrentRow = Range("AO1").value
 Call TurnOffStuff
+excelSettingsOff = True
 Do Until KPI.AtEndOfStream
     ArryLine = KPI.ReadLine
      CurrentLine = Split(ArryLine, ",")
@@ -199,21 +209,25 @@ Do Until KPI.AtEndOfStream
      Select Case CurrentLine(0)
      
         Case Is = "#DL"
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             Device = CurrentLine(3)
             Keep = Split(CurrentLine(3), " ")
+            If UBound(Keep) < 1 Then GoTo NextLogLine
             Keep(0) = Replace(Keep(0), """", "")
             Keep(1) = Replace(Keep(1), """", "")
             GetKeepOne = Keep(1)
             GetKeepZero = Keep(0)
         Case Is = "#START"
-            If Keep(1) = "3G" Then
+            If KeepValue(Keep, 1) = "3G" Then
+            If UBound(CurrentLine) < 3 Then GoTo NextLogLine
             ST = CurrentLine(1)
             Get_date = Mid(CurrentLine(3), 2, Len(CurrentLine(3)) - 2)
             Tdate = Split(Get_date, ".")
-            test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
+            If UBound(Tdate) >= 2 Then test_date = Tdate(1) & "/" & Tdate(0) & "/" & Tdate(2)
             End If
         Case Is = "DRATE"
-            If Keep(1) = "3G" Then
+            If KeepValue(Keep, 1) = "3G" Then
+            If UBound(CurrentLine) < 6 Then GoTo NextLogLine
             If CurrentLine(4) = "3" Then
                 Range("K" & CurrentRow) = test_date
                 Range("L" & CurrentRow) = CurrentLine(1)
@@ -226,7 +240,8 @@ Do Until KPI.AtEndOfStream
             End If
             End If
         Case Is = "DREQ"
-            If Keep(1) = "3G" Then
+            If KeepValue(Keep, 1) = "3G" Then
+            If UBound(CurrentLine) < 5 Then GoTo NextLogLine
             If CurrentLine(5) = "3" Then
                 Range("K" & CurrentRow) = test_date
                 Range("L" & CurrentRow) = CurrentLine(1)
@@ -237,7 +252,8 @@ Do Until KPI.AtEndOfStream
             End If
             End If
         Case Is = "DCOMP"
-            If Keep(1) = "3G" Then
+            If KeepValue(Keep, 1) = "3G" Then
+            If UBound(CurrentLine) < 4 Then GoTo NextLogLine
             If CurrentLine(4) = "3" Then
                 Range("K" & CurrentRow) = test_date
                 Range("L" & CurrentRow) = CurrentLine(1)
@@ -260,16 +276,19 @@ Do Until KPI.AtEndOfStream
             End If
             
         Case Is = "GPS"
-            If Keep(1) = "3G" Then
+            If KeepValue(Keep, 1) = "3G" Then
+            If UBound(CurrentLine) < 4 Then GoTo NextLogLine
             longitude = CurrentLine(3)
             latitude = CurrentLine(4)
             End If
         Case Is = "#STOP"
-            If Keep(1) = "3G" Then
+            If KeepValue(Keep, 1) = "3G" Then
+            If UBound(CurrentLine) < 1 Then GoTo NextLogLine
             Sp = CurrentLine(1)
             Exit Do
             End If
     End Select
+NextLogLine:
     
     
 Loop
@@ -282,7 +301,7 @@ KPI.Close
     Sheets(sh).Columns("K:R").AutoFit
     Range("AO1").value = CurrentRow
     
-    If Keep(1) = "3G" Then
+    If KeepValue(Keep, 1) = "3G" Then
     Sheets("Measurement_Info").Select
     lastRow = Cells(rows.Count, "A").End(xlUp).row
     lastRow = lastRow + 1
@@ -311,6 +330,7 @@ KPI.Close
     End If
     
 Call TurnOnStuff
+excelSettingsOff = False
 DirPathGlobal = DirPath
 
     If passNumber = 1 And isLastInTownDate = True Then
@@ -318,7 +338,7 @@ DirPathGlobal = DirPath
         Set ws = ThisWorkbook.Worksheets("Locations") ' Or Worksheets(1)
         
         ' Method 1: Find last used row in the entire sheet (most reliable)
-        LastUsedRow = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious).row
+        LastUsedRow = LastUsedRowInSheet(ws)
         
         ' Method 2: Alternative for last used row in specific column (e.g., Column A)
         ' lastUsedRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
@@ -379,19 +399,14 @@ DirPathGlobal = DirPath
         ' Find last row in Locations sheet
         lastRow = ws.Cells(ws.rows.Count, "A").End(xlUp).row
         
-        Dim sheetNames As Variant
         ' Loop through each row in Locations sheet (starting from row 2)
         For i = 2 To lastRow
         spotName = ws.Cells(i, "A").value
-        ' Turn off screen updating for faster execution
-        Application.DisplayAlerts = False
-        On Error Resume Next
-        Set ws = ThisWorkbook.Worksheets(spotName)
-        On Error GoTo ContinueLoop
-        ThisWorkbook.Sheets(spotName).Delete
-        Application.DisplayAlerts = True  ' Restore confirmation dialogs
-ContinueLoop:
-        ' Reset worksheet object for next iteration
+        If SheetExists(spotName) Then
+            Application.DisplayAlerts = False
+            ThisWorkbook.Sheets(spotName).Delete
+            Application.DisplayAlerts = True
+        End If
         Next i
         
         Set ws = Nothing
@@ -423,7 +438,16 @@ ContinueLoop:
     ElseIf passNumber = 2 Then
         
     End If
-    
+    Exit Sub
+
+FatalError:
+    errNumber = Err.Number
+    errDescription = Err.Description
+    On Error Resume Next
+    If Not KPI Is Nothing Then KPI.Close
+    If excelSettingsOff Then TurnOnStuff
+    MsgBox "ThreeGData failed while processing:" & vbCrLf & CStr(Fil) & vbCrLf & _
+           "Error " & errNumber & ": " & errDescription, vbExclamation, "ThreeGData"
 End Sub
 Sub TurnOffStuff()
     Application.Calculation = xlCalculationManual
@@ -455,5 +479,33 @@ Function FindworkbookPath() As String
     FindworkbookPath = workbookPath
 End Function
 
+Private Function LastUsedRowInSheet(ByVal ws As Worksheet) As Long
+    Dim foundCell As Range
 
+    Set foundCell = ws.Cells.Find("*", SearchOrder:=xlByRows, SearchDirection:=xlPrevious)
+    If foundCell Is Nothing Then
+        LastUsedRowInSheet = 1
+    Else
+        LastUsedRowInSheet = foundCell.row
+    End If
+End Function
 
+Private Function KeepValue(ByRef Keep() As String, ByVal index As Long) As String
+    On Error GoTo Missing
+    If index >= LBound(Keep) And index <= UBound(Keep) Then
+        KeepValue = Keep(index)
+    End If
+    Exit Function
+Missing:
+    KeepValue = ""
+End Function
+
+Private Function SheetExists(ByVal sheetName As String) As Boolean
+    Dim sh As Worksheet
+
+    On Error Resume Next
+    Set sh = ThisWorkbook.Worksheets(sheetName)
+    On Error GoTo 0
+
+    SheetExists = Not sh Is Nothing
+End Function
