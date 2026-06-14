@@ -6,6 +6,9 @@ Attribute VB_Name = "CSTCOVMOSMacro"
     Private Declare Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As Long)
 #End If
 Public DirPathGlobal As String, workbookPathGlobal As String ' Declare global variable
+Public SingleCSTOutputEnabled As Boolean
+Public SingleCSTOutputFolder As String
+Public SingleCSTOutputName As String
 Private TopologyCacheBuiltFor As String
 Private TopologySiteNames() As String
 Private TopologyCellNames() As String
@@ -28,6 +31,18 @@ Private CstTimeCacheWb As String
 Private CstTimes() As Double
 Private CstRows() As Long
 Private CstTimeCount As Long
+
+Public Sub ConfigureSingleCSTOutput(ByVal outputFolder As String, ByVal outputName As String, Optional ByVal enabled As Boolean = True)
+    SingleCSTOutputFolder = Trim$(outputFolder)
+    SingleCSTOutputName = Trim$(outputName)
+    SingleCSTOutputEnabled = enabled
+End Sub
+
+Public Sub ClearSingleCSTOutput()
+    SingleCSTOutputEnabled = False
+    SingleCSTOutputFolder = ""
+    SingleCSTOutputName = ""
+End Sub
 
 Private Sub WriteMosOrigRadioInfo(ByVal rowNo As Long, ByVal channelNo As String, ByVal bandInfo As String, ByVal callType As String, Optional ByVal networkName As String = "")
     Dim dlFreq As Variant
@@ -133,6 +148,7 @@ Dim CurrentRow As Long, CurrentRowMos As Long, CurrentRowRscp As Long, WordCount
 Dim Check As Integer
 Dim prt As String, areqt As String, arest As String, sut As String, cpt As String, cct As String, pt As String, ct As String, cat As String, dt As String, rt As String, rct As String, RSCPRxlev As String, workbookPath As String, file As String
 Dim wbPath As String
+Dim savePath As String
 Dim Tow As Long
 Dim fso As Scripting.FileSystemObject
 Dim lRow As Long
@@ -1323,7 +1339,8 @@ CurrentLineIncrementGSM:
     End If
     
     If Finish Then
-        ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & Keep(0) & "\CST\" & Keep(0) & " " & fileName(1) & " CST" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
+        savePath = CSTOutputWorkbookPath(GetDesktop, DirPath, Keep(0), fileName(1), Dayy(0))
+        ActiveWorkbook.SaveAs savePath, FileFormat:=xlOpenXMLWorkbookMacroEnabled
         DirPathGlobal = DirPath
         Sleep 3000  ' 3 second delay
         SaveTelcoWorkbook
@@ -1338,12 +1355,13 @@ CurrentLineIncrementGSM:
         Sleep 3000  ' 3 second delay
         Save
         Sleep 3000  ' 3 second delay
+        If SingleCSTOutputEnabled Then ClearSingleCSTOutput
         If Last = False Then
             Clear
         Else
             If Last = True And isLastArrayElement = True Then
             For Each wb In Workbooks
-            If wb.fullName = GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & Keep(0) & "\CST\" & Keep(0) & " " & fileName(1) & " CST" & Dayy(0) & ".xlsm" Then
+            If wb.fullName = savePath Then
                 wb.Close SaveChanges:=False
                 Exit For
             End If
@@ -1367,6 +1385,42 @@ FatalError:
     MsgBox "CSTCOVMOS failed while processing:" & vbCrLf & CStr(fil) & vbCrLf & _
            "Error " & errNumber & ": " & errDescription, vbExclamation, "CSTCOVMOS"
 End Sub
+
+Private Function CSTOutputWorkbookPath(ByVal desktopPath As String, ByVal dirPath As String, ByVal operatorName As String, ByVal fileToken As String, ByVal dayToken As String) As String
+    Dim folderPath As String
+    Dim outputName As String
+
+    If SingleCSTOutputEnabled And Trim$(SingleCSTOutputFolder) <> "" And Trim$(SingleCSTOutputName) <> "" Then
+        folderPath = EnsureTrailingSlash(SingleCSTOutputFolder)
+        outputName = CleanWorkbookFileName(SingleCSTOutputName)
+        If LCase$(Right$(outputName, 5)) <> ".xlsm" Then outputName = outputName & ".xlsm"
+        CSTOutputWorkbookPath = folderPath & outputName
+    Else
+        CSTOutputWorkbookPath = desktopPath & "QoS Automation\" & dirPath & "\NCA\" & operatorName & "\CST\" & _
+                                operatorName & " " & fileToken & " CST" & dayToken & ".xlsm"
+    End If
+End Function
+
+Private Function EnsureTrailingSlash(ByVal folderPath As String) As String
+    folderPath = Trim$(folderPath)
+    If Right$(folderPath, 1) = "\" Then
+        EnsureTrailingSlash = folderPath
+    Else
+        EnsureTrailingSlash = folderPath & "\"
+    End If
+End Function
+
+Private Function CleanWorkbookFileName(ByVal fileNameText As String) As String
+    Dim badChars As Variant
+    Dim item As Variant
+
+    badChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    CleanWorkbookFileName = Trim$(fileNameText)
+    For Each item In badChars
+        CleanWorkbookFileName = Replace(CleanWorkbookFileName, CStr(item), "_")
+    Next item
+    If CleanWorkbookFileName = "" Then CleanWorkbookFileName = "CST Output"
+End Function
 
 Sub TurnOffStuff()
     Application.Calculation = xlCalculationManual
