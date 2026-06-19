@@ -115,18 +115,19 @@ Public Sub ProcessSingleCSTFiles(ByVal cstExcelName As String, ByVal selectedCST
     CloseOtherCstWorkbooks
     Sleep 1000
     Set openedWorkbook = Workbooks.Open(workbookPath)
+    openedWorkbook.Activate
 
-    Application.Run "'" & openedWorkbook.FullName & "'!ConfigureSingleCSTOutput", storageFolderPath, cstExcelName, True
+    Application.Run "'" & openedWorkbook.FullName & "'!CSTCOVMOSSingleMacro.ConfigureSingleCSTOutput", storageFolderPath, cstExcelName, True
     engineConfigured = True
 
     For Each filePath In mocFiles
-        Application.Run "'" & openedWorkbook.FullName & "'!CSTCOVMOS", CStr(filePath), operatorName, trends, False, False, True
+        Application.Run "'" & openedWorkbook.FullName & "'!CSTCOVMOSSingleMacro.CSTCOVMOSSingle", CStr(filePath), operatorName, trends, False, False, True
     Next filePath
 
     finalMtcPath = CStr(mtcFiles(mtcFiles.Count))
     For Each filePath In mtcFiles
         isFinalFile = (StrComp(CStr(filePath), finalMtcPath, vbTextCompare) = 0)
-        Application.Run "'" & openedWorkbook.FullName & "'!CSTCOVMOS", CStr(filePath), operatorName, trends, isFinalFile, isFinalFile, True
+        Application.Run "'" & openedWorkbook.FullName & "'!CSTCOVMOSSingleMacro.CSTCOVMOSSingle", CStr(filePath), operatorName, trends, isFinalFile, isFinalFile, True
     Next filePath
 
     engineConfigured = False
@@ -138,7 +139,7 @@ FatalError:
     errDescription = Err.Description
     On Error Resume Next
     If engineConfigured And Not openedWorkbook Is Nothing Then
-        Application.Run "'" & openedWorkbook.FullName & "'!ClearSingleCSTOutput"
+        Application.Run "'" & openedWorkbook.FullName & "'!CSTCOVMOSSingleMacro.ClearSingleCSTOutput"
     End If
     MsgBox "Single CST processing failed:" & vbCrLf & _
            "Error " & errNumber & ": " & errDescription, vbExclamation, "Single CST Processing"

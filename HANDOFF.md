@@ -1,6 +1,6 @@
 # VBA Coding Handoff
 
-Last updated: 2026-06-15
+Last updated: 2026-06-19
 
 Repository: https://github.com/Clive-B/VBA-Coding.git
 
@@ -12,294 +12,302 @@ C:\Users\codro\Desktop\VBA Coding
 
 ## Operating Rules
 
-- Make code changes in the exported `.bas` files in this folder.
-- Do not import/update modules inside Excel workbooks unless the user explicitly asks for workbook updates.
-- When a new file appears in this folder, add it to the repo and push it.
-- The current Git branch is `main`.
-- Git sometimes shows warnings about `C:\Users\codro/.config/git/ignore` permission; those warnings have not blocked commits.
+- Edit the exported `.bas` / `.txt` files in this folder first.
+- Do not import modules into live Excel workbooks unless the user explicitly asks.
+- Before risky changes, create timestamped `.bak-YYYYMMDD-*` backups beside the source file.
+- The user manually imports updated modules into the relevant workbook/template.
+- Avoid public globals for cross-module state where possible; pass values as procedure arguments to prevent `Ambiguous name detected`.
+- Git may warn about `C:\Users\codro/.config/git/ignore` permission. It has not blocked normal commits.
 
-## Current Module Files
+## UserForm Pattern
 
-```text
-CovFiles.bas
-CSTCOVMOSSingleMacro.bas
-CSTFiles.bas
-CSTSingleFileProcessing.bas
-DataFiles.bas
-FourGCovAUI.bas
-FourGDataMacro.bas
-OpenCSTForm.bas
-Spots.bas
-ThreeGCovUI.bas
-ThreeGDataMacro.bas
-```
+The current Data/Coverage forms use image-backed UI with transparent label hot zones.
 
-## Important CST Status
-
-`CSTCOVMOSMacro.bas` was renamed to:
+Common control names:
 
 ```text
-CSTCOVMOSSingleMacro.bas
+txtDataExcelName / txtCoverageExcelName
+lblBrowseDataFile / lblBrowseCoverageFile
+lblSelectFolder
+lbl3G
+lbl4G
+lblSend
+lbl3GLeft
+lbl3GRight
+lbl4GLeft
+lbl4GRight
 ```
 
-The VBA module attribute inside the file was also changed to:
+The network labels act as invisible buttons. Marker labels beside 3G/4G are used for hover/selected color feedback. When a network is clicked, that selection stays highlighted, and the other network loses its highlight.
 
-```vba
-Attribute VB_Name = "CSTCOVMOSSingleMacro"
+For coverage form code, see:
+
+```text
+CoverageUserFormCode.txt
 ```
 
-The public macro procedure name remains:
+## CST Single Processing
 
-```vba
-Public Sub CSTCOVMOS(...)
-```
-
-This was intentional so existing `Application.Run "...!CSTCOVMOS"` calls can continue to work.
-
-## Single CST File Processing
-
-A new module was added:
+Main files:
 
 ```text
 CSTSingleFileProcessing.bas
+CSTCOVMOSSingleMacro.bas
+SaveWorkbookMacro.bas
+ResultsWB.bas
 ```
 
-Purpose:
+Key updates:
 
-- Support the new UserForm-driven CST workflow.
-- User selects one `.nmf` or `.nmfs` log file.
-- The selected file can be either MOC or MTC.
-- The code uses that selected file as an anchor.
-- It searches only the selected file's folder for related CST logs.
-- It groups matching split files for the same CST session/location.
-- It requires both MOC and MTC logs before processing.
-- It opens `Voice Template.xlsm` and runs `CSTCOVMOS` only for the related log set.
-
-Main entry points:
+- Added UserForm-driven single CST log processing.
+- The selected CST log is used as an anchor to find related MOC/MTC files in the same folder.
+- `CSTCOVMOSSingleMacro.bas` was separated from the batch `CSTCOVMOSMacro` module to avoid duplicate procedure/module conflicts.
+- Single and batch CST can exist in the same workbook, but duplicate public names still need care.
+- `SaveTelcoWorkbook` was changed to support optional output folder/campaign path:
 
 ```vba
-Public Sub ProcessSingleCSTFromForm()
-Public Sub ProcessSingleCSTFromSubmittedForm(Optional ByVal frm As Object = Nothing)
-Public Sub ProcessSingleCSTFiles(ByVal cstExcelName As String, ByVal selectedCSTFilePath As String, ByVal storageFolderPath As String)
+Sub SaveTelcoWorkbook(Optional ByVal outputFolderPath As String = "", Optional ByVal dirPathValue As String = "")
 ```
 
-The UserForm Send button should call:
+- For single output, save to the UserForm-selected output folder.
+- For batch output, preserve the original campaign structure.
+- `DirPathGlobal` ambiguity was avoided by passing `dirPath` into procedures instead of declaring duplicate globals.
+- `Copy_CSTMOS_TO_Results` is not part of `CSTCOVMOSSingleMacro`.
+- Single CST false-fatal behavior was corrected by exiting before final-only work when the current log is not the final related file:
 
 ```vba
-FormSubmitted = True
-Me.Hide
-ProcessSingleCSTFromSubmittedForm Me
+If Not Finish Then
+    Exit Sub
+End If
 ```
 
-If the form is launched through a standard macro instead, assign the button/menu to one of these launchers in `OpenCSTForm.bas`:
+## 3G Data Single Processing
 
-```vba
-OpenQoSTemplateForm
-OpenCSTForm
-OpenSingleCSTForm
-```
-
-All three call:
-
-```vba
-ProcessSingleCSTFromForm
-```
-
-## Expected UserForm Public Fields
-
-The UserForm should expose these public variables:
-
-```vba
-Public cstExcelName As String
-Public selectedCSTFilePath As String
-Public storageFolderPath As String
-Public FormSubmitted As Boolean
-```
-
-The file picker should allow:
-
-```vba
-*.nmf; *.nmfs
-```
-
-Recommended UserForm messages:
-
-- File picker title: `Select MOC or MTC NMF Log`
-- Missing file message: `Please select the CST log file.`
-
-## CST Output Override
-
-`CSTCOVMOSSingleMacro.bas` now includes optional single-run output controls:
-
-```vba
-Public SingleCSTOutputEnabled As Boolean
-Public SingleCSTOutputFolder As String
-Public SingleCSTOutputName As String
-
-Public Sub ConfigureSingleCSTOutput(ByVal outputFolder As String, ByVal outputName As String, Optional ByVal enabled As Boolean = True)
-Public Sub ClearSingleCSTOutput()
-```
-
-Normal batch CST processing still saves to the original path:
+Main files:
 
 ```text
-Desktop\QoS Automation\<DirPath>\NCA\<operator>\CST\...
+ThreeGDataSingleFileProcessing2.bas
+ThreeGDataMacro2.bas
+SaveWorkbookDataMacro.bas
 ```
 
-Single CST processing uses the UserForm-selected output folder and `cstExcelName`.
+Important behavior change:
 
-The helper that decides the save path is:
+- The selected file is now a day/technology selector, not a one-location selector.
+- Example data filename:
+
+```text
+26Jun09 112358 BEACH-ROAD ABSA BANK DATA DAY 1.2.nmf
+```
+
+- The single coordinator now groups related files by:
+
+```text
+Date | DATA DAY
+```
+
+instead of:
+
+```text
+Date | Town | Location
+```
+
+- It still filters candidate logs by `#DL` technology, so only 3G files are processed.
+- Each file still passes its own location to `ThreeGDataSingle`, allowing spot creation per location.
+- Earlier files run with `Finish = False`; only the final selected-day file runs final save/post-processing.
+
+Patch details:
+
+- `ThreeGDataSingleFileProcessing2.bas`
+  - Added `ExtractDayFromDataFile`.
+  - Updated `BuildSingleDataKey` to use `ExtractDateFromDataFile & "|" & ExtractDayFromDataFile`.
+- `ThreeGDataMacro2.bas`
+  - Added/kept single-output support.
+  - Changed location-boundary spot write so single mode always records the completed previous spot:
 
 ```vba
-Private Function CSTOutputWorkbookPath(...)
+If SingleDataOutputEnabled Or Dir(...) = "" Then
 ```
 
-## CST Batch Processing
+  - Skipped deleting generated spot sheets during single mode:
 
-`CSTFiles.bas` remains the batch processor.
-
-Current behavior:
-
-- Reads campaign/trend from `Sheets("Option").Range("AO1").Value`.
-- Scans:
-
-```text
-Desktop\QoS Automation\<Trends>\Telcos\<operator>\CST\LOGS
+```vba
+If Not SingleDataOutputEnabled Then
+    ' delete SpotOne, SpotTwo, ...
+End If
 ```
 
-- Operators:
+Test finding:
+
+- `TELECEL BEACH-ROAD 3G DATA DAY 1.xlsm` showed both logs were processed in `Logs`, but only one spot appeared in `Locations`.
+- Cause was the batch-only `Dir(...) = ""` guard preventing the first completed location from being written.
+- Fixed in `ThreeGDataMacro2.bas`.
+
+## 4G Data Single Processing
+
+Main files:
 
 ```text
-MTN
-TELECEL
-AT
+FourGDataSingleFileProcessing.bas
+FourGDataMacro.bas
+SaveWorkbookFourGMacro.bas
 ```
 
-- Groups logs by extracted town/date.
-- Splits files into MOC/MTC by reading `#DL`.
-- Opens:
+Key updates:
+
+- Added 4G single data processing route.
+- `FourGDataSingleFileProcessing.bas` now mirrors the corrected 3G behavior.
+- The selected file groups related 4G data logs by:
 
 ```text
-Desktop\QoS Automation\Templates\Voice Template.xlsm
+Date | DATA DAY
 ```
 
-- Runs `CSTCOVMOS` for each file.
+- `ExtractDayFromDataFile` was added.
+- `BuildSingleDataKey` was changed from date/town/location to date/day.
+- Candidate logs are still filtered by `#DL = 4G`.
+- `FourGDataMacro.bas` now records previous completed spots in single mode:
 
-## Data Module Fixes
+```vba
+If Single4GDataOutputEnabled Or Dir(...) = "" Then
+```
 
-Files:
+- 4G already had protection around deleting `Spot...Ping`, `Spot...Http`, and `Spot...FTP` sheets:
+
+```vba
+If Not Single4GDataOutputEnabled Then
+```
+
+so generated spot sheets remain in single mode.
+
+## Data Save Macros
+
+Main files:
 
 ```text
-DataFiles.bas
-ThreeGDataMacro.bas
+SaveWorkbookDataMacro.bas
+SaveWorkbookFourGMacro.bas
+SaveWorkbookMacro.bas
+```
+
+Key updates:
+
+- Save procedures accept optional output folder and campaign path.
+- Single mode saves copied workbooks into the UserForm-selected folder.
+- Batch mode keeps the original campaign folder structure.
+- `SaveWorkbookDataMacro.bas` maintains copied header formatting/font color by preserving the original copy/paste behavior for relevant ranges.
+- For 3G data copied workbook, the header formatting from:
+
+```vba
+ThisWorkbook.Sheets("GSM_DataReport_multimetric_5").Range("K1:R1").Copy
+NetworkWorkbook.Sheets(WSVame).Range("A1:H1").PasteSpecial
+```
+
+was preserved.
+
+## Coverage Single Processing
+
+Main files discussed or generated:
+
+```text
+ThreeGCovSingleFileProcessing.bas
+ThreeGCovSingle.bas
+SaveWorkbookThreeGCovMacro.bas
+FourGCovSingleFileProcessing.bas
+FourGCovSingle.bas
+SaveWorkbookFourGCovMacro.bas
+CoverageUserFormCode.txt
+```
+
+Notes:
+
+- Some files were named by the user for convenience before full code existed.
+- UserForm code/module code was generated for coverage single processing.
+- Single coverage mode should skip frequency comparison procedures that depend on batch campaign state:
+  - 3G: `GetARFCNValues`
+  - 4G: EARFCN equivalent where applicable
+- Single coverage mode needs fallback handling for empty `NetworkCurr`.
+- AT does not currently have 4G coverage, so 4G coverage behavior was kept conservative.
+
+## ARFCN / EARFCN Filtering
+
+Files reviewed:
+
+```text
+CodeUI.bas
+AutoFilterWithArrayUI.bas
+ARFCNComp.bas
+AutoFilterWithArrayUIFourG.bas
+EARFCNComp.bas
+```
+
+Outcome:
+
+- Batch-only ARFCN/EARFCN comparison steps should be skipped for single processed coverage files.
+- Single mode lacks some batch variables like `NetworkCurr`; fallback values must be supplied or the dependent procedure skipped.
+
+## Important Import Notes
+
+For 3G data single fixes, import:
+
+```text
+ThreeGDataSingleFileProcessing2.bas
+ThreeGDataMacro2.bas
+```
+
+The template workbook expects the callable module name used in `Application.Run`, for example:
+
+```vba
+ThreeGDataMacro.ConfigureSingleDataOutput
+ThreeGDataMacro.ThreeGDataSingle
+```
+
+So after import, ensure the module name inside the template matches what the coordinator calls.
+
+For 4G data single fixes, import:
+
+```text
+FourGDataSingleFileProcessing.bas
 FourGDataMacro.bas
 ```
 
-Key fixes made:
-
-- Hardened data processing loops and cleanup paths.
-- Added safer worksheet/file helper behavior.
-- Reduced repeated pass loops to a single pass where appropriate.
-- Stopped reopening workbook paths during cleanup.
-- Added safer last-used-row handling.
-- Added `KeepValue` helper changes so arrays returned by `Split(...)` can be passed safely.
-- Fixed compile error:
-
-```text
-Type mismatch: array or user-defined type expected
-```
-
-Cause:
+The 4G template expects:
 
 ```vba
-Keep = Split(...)
+FourGDataMacro.ConfigureSingle4GDataOutput
+FourGDataMacro.FourGDataSingle
 ```
 
-returns a Variant array, but the helper expected `String()`.
+## Backups Created During This Work
 
-Fix:
-
-```vba
-Private Function KeepValue(ByVal Keep As Variant, ByVal index As Long) As String
-```
-
-- Fixed runtime error:
+Recent backup examples:
 
 ```text
-Run-time error '424': Object required
+ThreeGDataSingleFileProcessing2.bas.bak-20260618-daywide-single-data
+ThreeGDataMacro2.bas.bak-20260618-daywide-single-data
+ThreeGDataMacro2.bas.bak-20260619-single-spot-boundary
+ThreeGDataMacro2.bas.bak-20260619-keep-single-spot-sheets
+FourGDataSingleFileProcessing.bas.bak-20260619-daywide-single-data
+FourGDataMacro.bas.bak-20260619-single-spot-boundary
 ```
 
-Cause in `DataFiles.bas`:
-
-```vba
-If Not wb Is Nothing Then
-```
-
-`wb` was not declared as a `Workbook` in `ProcessDataFiles`.
-
-Fix:
-
-```vba
-Dim wb As Workbook
-```
-
-## Coverage Module Fixes
-
-Files:
-
-```text
-CovFiles.bas
-ThreeGCovUI.bas
-FourGCovAUI.bas
-```
-
-Coverage modules were reviewed and hardened earlier. Fixes were committed and pushed. Do not assume workbook modules contain the same code unless the user has imported the exported files manually.
-
-Important note:
-
-At one point, modules were mistakenly imported into workbooks for compile validation. The user later clarified:
-
-```text
-Next time please don't update in the workbook.
-```
-
-Respect this as the standing rule.
-
-## Git Commit Trail
-
-Recent commits:
-
-```text
-f678625 Clarify direct CST form helper call
-c34311a Add direct CST form submit support
-e93fd97 Rename CST COV MOS single macro module
-1d07d89 Add single CST log processing flow
-60381aa Fix DataFiles workbook cleanup object
-ce329c4 Fix data KeepValue helper
-d90a23d Harden data VBA processing
-bff789a Add data processing modules
-273ee74 Harden coverage VBA processing
-2bac14d Add coverage UI modules
-807a2c5 Initial VBA coding modules
-```
+Older backup files remain in the workspace for CST, data, coverage, save macros, ARFCN, and EARFCN work.
 
 ## Validation Performed
 
-Text-level checks were run on edited `.bas` files:
-
-- Procedure and `End Sub` / `End Function` counts were balanced.
-- Git status was checked after pushes.
-- No workbook import/compile validation was performed after the user instructed not to update workbooks.
+- Text-level procedure tracing was performed with PowerShell.
+- Excel COM was used in read-only mode to inspect `TELECEL BEACH-ROAD 3G DATA DAY 1.xlsm`.
+- That inspection confirmed both 3G logs were processed but only one spot was initially written.
+- After analysis, the spot-boundary logic was patched.
+- No direct workbook module import/compile was performed unless the user explicitly does it manually.
 
 ## Current Caveats
 
-- The active IDE tab may still show `CSTCOVMOSMacro.bas`, but the exported source in the repo is now `CSTCOVMOSSingleMacro.bas`.
-- Excel workbooks will not automatically receive these `.bas` changes. The user must manually import modules, or explicitly authorize workbook updates.
-- If `ProcessSingleCSTFromSubmittedForm` is called from the UserForm, use:
-
-```vba
-ProcessSingleCSTFromSubmittedForm Me
-```
-
-- If the new UserForm is launched directly in the VBE without a caller, `Me.Hide` alone does not start processing. Either call the helper with `Me` in `lblSend_Click`, or launch the form using `OpenSingleCSTForm`.
-
+- Workbooks do not automatically receive `.bas` changes. Import updated modules manually into the correct workbook/template.
+- If both original and single modules live in one workbook, avoid duplicate public procedure names unless `Application.Run` qualifies the exact module.
+- Generated test workbooks should not be committed unless intentionally needed as artifacts.
+- If single processing appears to process all logs but creates too few spots, check:
+  - the related-file grouping key,
+  - `prevlocKey` / `PrevlocationName`,
+  - location-boundary spot writes,
+  - and any old `Dir(...) = ""` batch guards.

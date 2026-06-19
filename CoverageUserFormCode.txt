@@ -1,0 +1,190 @@
+Paste this code inside the Coverage UserForm code window.
+
+Required control names:
+txtCoverageExcelName
+lblBrowseCoverageFile
+lblSelectFolder
+lbl3G
+lbl4G
+lblSend
+
+Optional highlight marker labels:
+lbl3GLeft
+lbl3GRight
+lbl4GLeft
+lbl4GRight
+
+Option Explicit
+
+Public CoverageExcelName As String
+Public SelectedCoverageFilePath As String
+Public StorageFolderPath As String
+Public SelectedNetwork As String
+Public FormSubmitted As Boolean
+
+Private Const COLOR_OFF As Long = &HFFFFFF
+Private Const COLOR_3G As Long = &HFF00FF
+Private Const COLOR_4G As Long = &HFF9900
+
+Private Sub UserForm_Initialize()
+    FormSubmitted = False
+    CoverageExcelName = ""
+    SelectedCoverageFilePath = ""
+    StorageFolderPath = ""
+    SelectedNetwork = ""
+
+    PrepareHotZones
+    ApplyNetworkVisualState ""
+End Sub
+
+Private Sub PrepareHotZones()
+    On Error Resume Next
+
+    lblBrowseCoverageFile.BackStyle = fmBackStyleTransparent
+    lblBrowseCoverageFile.BorderStyle = fmBorderStyleNone
+    lblBrowseCoverageFile.Caption = ""
+    lblBrowseCoverageFile.ZOrder 0
+
+    lblSelectFolder.BackStyle = fmBackStyleTransparent
+    lblSelectFolder.BorderStyle = fmBorderStyleNone
+    lblSelectFolder.Caption = ""
+    lblSelectFolder.ZOrder 0
+
+    lbl3G.BackStyle = fmBackStyleTransparent
+    lbl3G.BorderStyle = fmBorderStyleNone
+    lbl3G.Caption = ""
+    lbl3G.ZOrder 0
+
+    lbl4G.BackStyle = fmBackStyleTransparent
+    lbl4G.BorderStyle = fmBorderStyleNone
+    lbl4G.Caption = ""
+    lbl4G.ZOrder 0
+
+    lblSend.BackStyle = fmBackStyleTransparent
+    lblSend.BorderStyle = fmBorderStyleNone
+    lblSend.Caption = ""
+    lblSend.ZOrder 0
+
+    On Error GoTo 0
+End Sub
+
+Private Sub lblBrowseCoverageFile_Click()
+    Dim fd As FileDialog
+
+    Set fd = Application.FileDialog(msoFileDialogFilePicker)
+
+    With fd
+        .Title = "Select Coverage NMF Log File"
+        .AllowMultiSelect = False
+        .Filters.Clear
+        .Filters.Add "NMF Log Files", "*.nmf; *.nmfs"
+        .Filters.Add "All Files", "*.*"
+
+        If .Show <> -1 Then Exit Sub
+
+        SelectedCoverageFilePath = .SelectedItems(1)
+    End With
+
+    Set fd = Nothing
+    MsgBox "Coverage log file selected successfully.", vbInformation, "File Selected"
+End Sub
+
+Private Sub lblSelectFolder_Click()
+    Dim fd As FileDialog
+
+    Set fd = Application.FileDialog(msoFileDialogFolderPicker)
+
+    With fd
+        .Title = "Select Output Folder"
+        .AllowMultiSelect = False
+
+        If .Show <> -1 Then Exit Sub
+
+        StorageFolderPath = .SelectedItems(1)
+    End With
+
+    Set fd = Nothing
+    MsgBox "Output folder selected successfully.", vbInformation, "Folder Selected"
+End Sub
+
+Private Sub lbl3G_Click()
+    SelectNetwork "3G"
+End Sub
+
+Private Sub lbl4G_Click()
+    SelectNetwork "4G"
+End Sub
+
+Private Sub lbl3G_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    If SelectedNetwork <> "3G" Then ApplyNetworkVisualState "3G"
+End Sub
+
+Private Sub lbl4G_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    If SelectedNetwork <> "4G" Then ApplyNetworkVisualState "4G"
+End Sub
+
+Private Sub UserForm_MouseMove(ByVal Button As Integer, ByVal Shift As Integer, ByVal X As Single, ByVal Y As Single)
+    ApplyNetworkVisualState SelectedNetwork
+End Sub
+
+Private Sub SelectNetwork(ByVal networkText As String)
+    SelectedNetwork = networkText
+    ApplyNetworkVisualState SelectedNetwork
+End Sub
+
+Private Sub ApplyNetworkVisualState(ByVal activeNetwork As String)
+    SetMarkerState "lbl3GLeft", (activeNetwork = "3G"), COLOR_3G
+    SetMarkerState "lbl3GRight", (activeNetwork = "3G"), COLOR_3G
+    SetMarkerState "lbl4GLeft", (activeNetwork = "4G"), COLOR_4G
+    SetMarkerState "lbl4GRight", (activeNetwork = "4G"), COLOR_4G
+End Sub
+
+Private Sub SetMarkerState(ByVal controlName As String, ByVal isActive As Boolean, ByVal activeColor As Long)
+    On Error Resume Next
+
+    With Me.Controls(controlName)
+        .BackStyle = fmBackStyleOpaque
+        .BorderStyle = fmBorderStyleNone
+        .Caption = ""
+        If isActive Then
+            .BackColor = activeColor
+        Else
+            .BackColor = COLOR_OFF
+        End If
+    End With
+
+    On Error GoTo 0
+End Sub
+
+Private Sub lblSend_Click()
+    CoverageExcelName = Trim$(txtCoverageExcelName.Text)
+
+    If CoverageExcelName = "" Then
+        MsgBox "Please enter the Coverage Excel Name.", vbExclamation, "Missing Coverage Excel Name"
+        txtCoverageExcelName.SetFocus
+        Exit Sub
+    End If
+
+    If SelectedCoverageFilePath = "" Then
+        MsgBox "Please select the Coverage NMF log file.", vbExclamation, "Missing Coverage File"
+        Exit Sub
+    End If
+
+    If SelectedNetwork = "" Then
+        MsgBox "Please select either 3G or 4G.", vbExclamation, "Missing Network Selection"
+        Exit Sub
+    End If
+
+    If SelectedNetwork <> "3G" And SelectedNetwork <> "4G" Then
+        MsgBox "Please select either 3G or 4G.", vbExclamation, "Unsupported Network"
+        Exit Sub
+    End If
+
+    If StorageFolderPath = "" Then
+        MsgBox "Please select the output folder.", vbExclamation, "Missing Output Folder"
+        Exit Sub
+    End If
+
+    FormSubmitted = True
+    Me.Hide
+End Sub

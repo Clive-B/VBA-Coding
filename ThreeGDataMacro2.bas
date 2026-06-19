@@ -1,4 +1,4 @@
-Attribute VB_Name = "ThreeGDataMacro"
+Attribute VB_Name = "ThreeGDataMacro2"
 ' Add this at the top of your module (before any procedures)
 #If VBA7 Then
     Private Declare PtrSafe Sub Sleep Lib "kernel32" (ByVal dwMilliseconds As LongPtr)
@@ -182,7 +182,7 @@ If Not IsEmpty(prevlocKey) Then
             If isSame = True Then
             Sheets("Locations").Range("D" & LastUsedRow) = numberValue - 1
             Else
-            If Dir((GetDesktop & "QoS Automation\" & dirPath & "\NCA\" & GetKeepZero & "\DATA\" & GetKeepZero & " " & prevtown & " " & GetKeepOne & " " & "DATA" & GetDayyZero & ".xlsm")) = "" Then
+            If SingleDataOutputEnabled Or Dir((GetDesktop & "QoS Automation\" & dirPath & "\NCA\" & GetKeepZero & "\DATA\" & GetKeepZero & " " & prevtown & " " & GetKeepOne & " " & "DATA" & GetDayyZero & ".xlsm")) = "" Then
             Sheets("Locations").Range("A" & firstUnusedRow) = "Spot" & SpotNum
             Sheets("Locations").Range("B" & firstUnusedRow) = GetSaveZero
             cellValue = Sheets("GSM_DataReport_multimetric_5").Range("AO1").value
@@ -429,22 +429,24 @@ DirPathGlobal = dirPath
         Sleep 3000  ' 3 second delay
         Ending = CurrentRow
         
-        Set ws = ThisWorkbook.Sheets("Locations")
-        
-        ' Find last row in Locations sheet
-        lastRow = ws.Cells(ws.rows.Count, "A").End(xlUp).row
-        
-        ' Loop through each row in Locations sheet (starting from row 2)
-        For i = 2 To lastRow
-        spotName = ws.Cells(i, "A").value
-        If SheetExists(spotName) Then
-            Application.DisplayAlerts = False
-            ThisWorkbook.Sheets(spotName).Delete
-            Application.DisplayAlerts = True
+        If Not SingleDataOutputEnabled Then
+            Set ws = ThisWorkbook.Sheets("Locations")
+            
+            ' Find last row in Locations sheet
+            lastRow = ws.Cells(ws.rows.Count, "A").End(xlUp).row
+            
+            ' Loop through each row in Locations sheet (starting from row 2)
+            For i = 2 To lastRow
+            spotName = ws.Cells(i, "A").value
+            If SheetExists(spotName) Then
+                Application.DisplayAlerts = False
+                ThisWorkbook.Sheets(spotName).Delete
+                Application.DisplayAlerts = True
+            End If
+            Next i
+            
+            Set ws = Nothing
         End If
-        Next i
-        
-        Set ws = Nothing
         
         ' Turn screen updating back on
         Application.ScreenUpdating = True

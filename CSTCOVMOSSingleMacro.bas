@@ -127,7 +127,7 @@ Private Sub GetGsmFrequency(ByVal networkName As String, ByVal channelNo As Doub
     End If
 End Sub
 
-Public Sub CSTCOVMOS(fil, element, DirPath As String, Finish As Boolean, Last As Boolean, Optional isLastArrayElement As Boolean)
+Public Sub CSTCOVMOSSingle(fil, element, DirPath As String, Finish As Boolean, Last As Boolean, Optional isLastArrayElement As Boolean)
 
 'Sub CSTCOVMOS()
 
@@ -1343,7 +1343,11 @@ CurrentLineIncrementGSM:
         ActiveWorkbook.SaveAs savePath, FileFormat:=xlOpenXMLWorkbookMacroEnabled
         DirPathGlobal = DirPath
         Sleep 3000  ' 3 second delay
-        SaveTelcoWorkbook
+        If SingleCSTOutputEnabled Then
+            SaveTelcoWorkbook SingleCSTOutputFolder, DirPath
+        Else
+            SaveTelcoWorkbook "", DirPath
+        End If
         Sleep 3000  ' 3 second delay
         CodeMos
         Sleep 3000  ' 3 second delay
@@ -1382,8 +1386,8 @@ FatalError:
     On Error Resume Next
     If Not KPI Is Nothing Then KPI.Close
     If excelSettingsOff Then TurnOnStuff
-    MsgBox "CSTCOVMOS failed while processing:" & vbCrLf & CStr(fil) & vbCrLf & _
-           "Error " & errNumber & ": " & errDescription, vbExclamation, "CSTCOVMOS"
+    MsgBox "CSTCOVMOSSingle failed while processing:" & vbCrLf & CStr(fil) & vbCrLf & _
+           "Error " & errNumber & ": " & errDescription, vbExclamation, "CSTCOVMOSSingle"
 End Sub
 
 Private Function CSTOutputWorkbookPath(ByVal desktopPath As String, ByVal dirPath As String, ByVal operatorName As String, ByVal fileToken As String, ByVal dayToken As String) As String

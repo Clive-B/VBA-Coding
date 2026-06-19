@@ -230,7 +230,7 @@ DirPathGlobal = DirPath
         If FinalTime = True Then
         ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & Keep(0) & "\COVERAGE\" & Keep(0) & " " & TownName(2) & " " & Keep(1) & " " & "COVERAGE" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
         Sleep 6000  ' 3 second delay
-        SaveTelcoWorkbook
+        SaveTelcoWorkbook "", DirPath
         Sleep 6000  ' 3 second delay
         Code
         ActiveWorkbook.Save

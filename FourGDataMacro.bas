@@ -9,11 +9,39 @@ Public DirPathGlobal As String, workbookPathGlobal As String, GetKeepZero As Str
 Public GetSaveZero As String, GetDayyZero As String, endRow As String, Beginning As String, BeginningHttp As String, BeginningFtp As String, Ending As String, EndingHttp As String, EndingFtp As String, GetTownNameTwo As String
 Public prevlocKey As Variant ' Declare global variable
 Public prevtown, PrevFileDate, PrevlocationName, PrevDupBreak As String ' Declare global variable
+Public Single4GDataOutputEnabled As Boolean
+Public Single4GDataOutputFolder As String
+Public Single4GDataOutputName As String
+
+Public Sub ConfigureSingle4GDataOutput(ByVal outputFolder As String, ByVal outputName As String, Optional ByVal enabled As Boolean = True)
+    Single4GDataOutputFolder = Trim$(outputFolder)
+    Single4GDataOutputName = Trim$(outputName)
+    Single4GDataOutputEnabled = enabled
+End Sub
+
+Public Sub ClearSingle4GDataOutput()
+    Single4GDataOutputEnabled = False
+    Single4GDataOutputFolder = ""
+    Single4GDataOutputName = ""
+End Sub
+
+Public Sub FourGDataSingle(Fil As String, DupBreak As String, LogfileName As String, locationName As String, fileDate As String, DirPath As String, Finish As Boolean, _
+               isLastInTownDate As Boolean, isLastArrayElement As Boolean, _
+               isLastForLocation As Boolean, FinalTime As Boolean, passNumber As Integer, _
+               locKey As Variant, _
+               Optional location As String = "", _
+               Optional sourceTown As String = "")
+    FourGData Fil, DupBreak, LogfileName, locationName, fileDate, DirPath, Finish, _
+              isLastInTownDate, isLastArrayElement, isLastForLocation, FinalTime, passNumber, _
+              locKey, location, sourceTown
+End Sub
+
 Sub FourGData(Fil As String, DupBreak As String, LogfileName As String, locationName As String, fileDate As String, DirPath As String, Finish As Boolean, _
                isLastInTownDate As Boolean, isLastArrayElement As Boolean, _
                isLastForLocation As Boolean, FinalTime As Boolean, passNumber As Integer, _
                locKey As Variant, _
-               Optional location As String = "")
+               Optional location As String = "", _
+               Optional sourceTown As String = "")
 
 Dim KPI As Scripting.TextStream
 Dim ArryLine As String, latitude As String, longitude As String, Get_date As String, test_date As String, sh As String, Fgname As String
@@ -56,7 +84,11 @@ Dim spotName As String
 
 On Error GoTo FatalError
 
-NameTown = Application.Run("'QoS.xlsm'!GetPublicVar")
+If Trim$(sourceTown) <> "" Then
+    NameTown = Trim$(sourceTown)
+Else
+    NameTown = Application.Run("'QoS.xlsm'!GetPublicVar")
+End If
 
 Set oWSHShell = CreateObject("WScript.Shell")
 GetDesktop = oWSHShell.SpecialFolders("Desktop")
@@ -148,7 +180,7 @@ If Not IsEmpty(prevlocKey) Then
             If isSame = True Then
             Sheets("Locations").Range("D" & LastUsedRow) = numberValue - 1
             Else
-            If Dir((GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & GetKeepZero & "\DATA\" & GetKeepZero & " " & prevtown & " " & GetKeepOne & " " & "DATA" & GetDayyZero & ".xlsm")) = "" Then
+            If Single4GDataOutputEnabled Or Dir((GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & GetKeepZero & "\DATA\" & GetKeepZero & " " & prevtown & " " & GetKeepOne & " " & "DATA" & GetDayyZero & ".xlsm")) = "" Then
             Sheets("Locations").Range("A" & firstUnusedRow) = "Spot" & SpotNum
             Sheets("Locations").Range("B" & firstUnusedRow) = GetSaveZero
             cellValue = Sheets("Ping").Range("AO1").value
@@ -481,13 +513,19 @@ excelSettingsOff = False
         ws.Range("F" & (lastRow + 1)).Formula = "=AVERAGE(Ping!O:O)"
         ws.Range("G" & (lastRow + 1)).Formula = "=AVERAGE(HTTPIPServiceSetupTime!O:O)"
         ws.Range("H" & (lastRow + 1)).Formula = "=AVERAGE(FTPThroughput!Q:Q)"
-        ActiveWorkbook.SaveAs GetDesktop & "QoS Automation\" & DirPath & "\NCA\" & KeepValue(Keep, 0) & "\DATA\" & KeepValue(Keep, 0) & " " & TownName(2) & " " & KeepValue(Keep, 1) & " " & "DATA" & Dayy(0) & ".xlsm", FileFormat:=xlOpenXMLWorkbookMacroEnabled
+        ActiveWorkbook.SaveAs FourGDataOutputWorkbookPath(GetDesktop, DirPath, KeepValue(Keep, 0), TownName(2), KeepValue(Keep, 1), Dayy(0)), FileFormat:=xlOpenXMLWorkbookMacroEnabled
         CopyARFCNChannels
         Sleep 3000  ' 3 second delay
-        SaveTelcoWorkbook
+        If Single4GDataOutputEnabled Then
+            SaveTelcoWorkbook Single4GDataOutputFolder, DirPath
+        Else
+            SaveTelcoWorkbook "", DirPath
+        End If
         Sleep 3000  ' 3 second delay
-        Copy_3GData_TO_Results
-        Sleep 3000  ' 3 second delay
+        If Not Single4GDataOutputEnabled Then
+            Copy_3GData_TO_Results
+            Sleep 3000  ' 3 second delay
+        End If
         BuildStationaryDataMapLayers
         ActiveWorkbook.Save
         Sleep 3000  ' 3 second delay
@@ -495,6 +533,7 @@ excelSettingsOff = False
         EndingHttp = CurrentRowHttp
         EndingFtp = CurrentRowFtp
         
+        If Not Single4GDataOutputEnabled Then
         Set ws = ThisWorkbook.Sheets("Locations")
         
         ' Find last row in Locations sheet
@@ -581,6 +620,9 @@ excelSettingsOff = False
         Beginning = Sheets("Ping").Range("AO1")
         BeginningHttp = Sheets("HTTPIPServiceSetupTime").Range("AO1")
         BeginningFtp = Sheets("FTPThroughput").Range("AO1")
+        End If
+
+        If Single4GDataOutputEnabled Then ClearSingle4GDataOutput
 
     
         End If
@@ -596,9 +638,56 @@ FatalError:
     On Error Resume Next
     If Not KPI Is Nothing Then KPI.Close
     If excelSettingsOff Then TurnOnStuff
+    If Single4GDataOutputEnabled Then ClearSingle4GDataOutput
     MsgBox "FourGData failed while processing:" & vbCrLf & CStr(Fil) & vbCrLf & _
            "Error " & errNumber & ": " & errDescription, vbExclamation, "FourGData"
 End Sub
+
+Private Function FourGDataOutputWorkbookPath(ByVal desktopPath As String, ByVal dirPath As String, ByVal networkName As String, ByVal townName As String, ByVal techName As String, ByVal dayText As String) As String
+    Dim outputFolder As String
+    Dim outputName As String
+
+    If Single4GDataOutputEnabled And Trim$(Single4GDataOutputFolder) <> "" Then
+        outputFolder = EnsureTrailingSlash(Single4GDataOutputFolder)
+        If Trim$(Single4GDataOutputName) <> "" Then
+            outputName = Single4GDataOutputName
+        Else
+            outputName = networkName & " " & townName & " " & techName & " DATA" & dayText
+        End If
+    Else
+        outputFolder = desktopPath & "QoS Automation\" & dirPath & "\NCA\" & networkName & "\DATA\"
+        outputName = networkName & " " & townName & " " & techName & " DATA" & dayText
+    End If
+
+    FourGDataOutputWorkbookPath = outputFolder & CleanWorkbookFileName(outputName) & ".xlsm"
+End Function
+
+Private Function EnsureTrailingSlash(ByVal folderPath As String) As String
+    folderPath = Trim$(folderPath)
+    If folderPath = "" Then Exit Function
+    If Right$(folderPath, 1) = "\" Or Right$(folderPath, 1) = "/" Then
+        EnsureTrailingSlash = folderPath
+    Else
+        EnsureTrailingSlash = folderPath & "\"
+    End If
+End Function
+
+Private Function CleanWorkbookFileName(ByVal fileNameText As String) As String
+    Dim badChars As Variant
+    Dim badChar As Variant
+
+    badChars = Array("\", "/", ":", "*", "?", """", "<", ">", "|")
+    fileNameText = Trim$(fileNameText)
+    For Each badChar In badChars
+        fileNameText = Replace(fileNameText, CStr(badChar), " ")
+    Next badChar
+
+    Do While InStr(fileNameText, "  ") > 0
+        fileNameText = Replace(fileNameText, "  ", " ")
+    Loop
+
+    CleanWorkbookFileName = fileNameText
+End Function
 
 Sub TurnOffStuff()
     Application.Calculation = xlCalculationManual
